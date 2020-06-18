@@ -1,0 +1,73 @@
+{
+このスクリプトでは
+・コインをいれてね
+・各種モード選択
+などのフィールドよりも上に表示されるものを管理しています。
+
+つかいかた
+fieldクラスのfunc uiShow(mode: int)の中に含まれているのでこの関数を呼びます。
+}
+
+class UpperUI()
+	var font1: \font@FontBC
+	var arrow: \animation@Arrow
+	var pressEnter: draw@Tex
+	var cPos: int
+	var pressEnterAni: \animation@PressEnter
+	*func ctor()
+		do me.font1 :: #\font@FontBC
+		do me.arrow :: #\animation@Arrow
+		do me.pressEnter :: draw@makeTex("res/press.png")
+		do me.pressEnterAni :: #\animation@PressEnter
+	end func
+	
+	+func show(x: int, y: int, mode: int)
+		switch(mode)
+		case 0 {coinWaiting}
+			do me.pressEnterShow(x, y + 224)
+		case 1 {Control Select}
+			do me.controlSelect(x, y)
+		case 2 {Difficulty Select}
+			do me.difficultySelect(x, y)
+		case 3 {仮置}
+			do me.showClearMessage(x, y)
+		case 4 {Difficulty Select URA}
+			do me.difficultySelect_(x, y)
+		end switch
+		
+	end func
+	
+	var enterShowTimer: int
+	+func pressEnterShow(x: int, y: int)
+		;do me.enterShowTimer :+ 1
+		;if(me.enterShowTimer % 120 < 60)
+		;	do me.pressEnter.drawScale(x $ float, (y + 120) $ float, 160.0 * 2.0, 80.0 * 2.0, 0.0, 0.0, 320.0, 160.0, 0xFFFFFFFF)
+		;end if
+		do me.pressEnterAni.show(x, y)
+	end func
+	
+	func controlSelect(x: int, y: int)
+		do me.font1.mes("CURSOR_SPEED", x + 32, y + 32 * 3)
+		do me.font1.mes("OSOI", x + 64, y + 32 * 5)
+		do me.font1.mes("FUTSU", x + 64, y + 32 * 7)
+		do me.font1.mes("HAYAI", x + 64, y + 32 * 9)
+	end func
+	
+	func difficultySelect(x: int, y: int)
+		do me.font1.mes("DIFFICULTY", x + 32, y + 32 * 3)
+		do me.font1.mes("MUZUI", x + 64, y + 32 * 5)
+		do me.font1.mes("MURI", x + 64, y + 32 * 7)
+	end func
+	
+	func difficultySelect_(x: int, y: int)
+		do me.font1.mes("DIFFICULTY", x + 32, y + 32 * 3)
+		do me.font1.mes("MUZUI", x + 64, y + 32 * 5)
+		do me.font1.mes("MURI", x + 64, y + 32 * 7)
+		do me.font1.mes("YABAI", x + 64, y + 32 * 9)
+	end func
+	
+	func showClearMessage(x: int, y: int)
+		do me.font1.mes("YOU_ALL_CLEAR", x + 16, y + 320)
+	end func
+	
+end class

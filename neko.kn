@@ -1,0 +1,347 @@
++class Neko()
+	var ringB: @RingB
+	var ringF: @RingF
+	var body: @Body
+	var light: @Light
+	var pi: @Pi
+	var head: @Head
+	var mayu: @Mayu
+	var mouth: @Mouth
+	var eye: @Eye
+	
+	var impulse: int
+	var impulseT: int
+	
+	var mabutaT: int
+	;var kao: int
+	*func ctor()
+		do me.ringB :: #@RingB
+		do me.ringF :: #@RingF
+		do me.body :: #@Body
+		do me.light :: #@Light
+		do me.pi :: #@Pi
+		do me.head :: #@Head
+		do me.mayu :: #@Mayu
+		do me.mouth :: #@Mouth
+		do me.eye :: #@Eye
+		;do me.kao :: 0
+	end func
+	
+	+func damage(life: int, time: int)
+		;ダメージ一般処理
+		do me.impulse :: -8
+		do me.impulseT :: time
+		do me.light.modeChange(1, time)
+		do me.pi.modeChange(1, time)
+		do me.eye.modeChange(3, time)
+	end func
+	
+	+func pulse(mode: []char, life: int, time: int)
+		var modelist: []int
+		switch(mode)
+			{胸、眉、目、口の順。胸はばるんするかどうかだけ指定}
+		case "0" {いつものかお}
+			do modelist :: [0, 0, 0, 0]
+		case "1" {むー}
+			do modelist :: [0, 1, 9, 7]
+		case "2" {まがお}
+			do modelist :: [0, 3, 7, 0]
+		case "3" {にがて}
+			do modelist :: [0, 4, 0, 5]
+		case "4" {目きらきら}
+			do modelist :: [0, 0, 2, 1]
+		case "5" {いたい}
+			do modelist :: [0, 1, 0, 7]
+		case "6" {ほー}
+			do modelist :: [0, 0, 0, 3]
+		case "7" {どや}
+			do modelist :: [0, 0, 0, 2]
+		case "8" {にゃーん（痛）}
+			do modelist :: [1, 6, 3, 1]
+		case "9" {声を出さない（痛）}
+			do modelist :: [1, 6, 3, 7]
+		default
+			do modelist :: [0, 0, 0, 0]
+		end switch
+		do me.pi.modeChange(modelist[0] + (4 - life).clamp(0, 3) * 2, time)
+		do me.mayu.modeChange(modelist[1], time)
+		do me.eye.modeChange(modelist[2], time)
+		do me.mouth.modeChange(modelist[3], time)
+	end func
+	
+	+func draw(x: int, y: int, time: int, mx: int, my: int, triger: bool)
+		;ダメージ揺れを反映
+		do y :+ me.impulse * 2
+		if(time - me.impulseT > 50)
+			do me.impulse :/ -2
+			do me.impulseT :: time
+		end if
+		;まばたき自動処理
+		if(me.mabutaT < time)
+			do me.mabutaT :: time + lib@rnd(400 + 1500, 400 + 5000)
+			;do me.eye.modeChange(1, time)
+			do me.eye.mabataki(time)
+		end if
+		
+		do me.ringB.show(x, y, time)
+		
+		do me.body.show(x, y, 0)
+		
+		do me.light.show(x, y + 2, time)
+		do me.pi.show(x + 118 * 2, y + 65 * 2, time)
+		do me.kaoDraw(x + 124 * 2, y, time)
+		
+		do me.ringF.show(x, y, time)
+		
+	end func
+	func kaoDraw(x: int, y: int, time: int)
+		do me.head.show(x, y, time)
+		do me.mayu.show(x + 12 * 2, y + 19 * 2, time)
+		do me.eye.show(x + 12 * 2, y + 19 * 2, time)
+		do me.mouth.show(x + 12 * 2, y + 51 * 2, time)
+	end func
+end class
+
++class syncAnimation() {元のアニメーションと違って現実時間基準だし統一しないとなので別でつくるよ}
+	var oneRange: int {アニメーション等倍}
+	var loopTime: int
+	var image: draw@Tex
+	var haba: int {画像幅 アニメーションのどの画像を用いるかに使う}
+	var takasa: int
+	var mode: int
+	var pivotTime: int
+	
+	{初期化不要}
+	var beforeTime: float
+	*func ctor()
+		throw 0xFF1
+	end func
+	+func show(x: int, y: int, timer: int)
+		var temp: []int
+		if(me.loopTime = -1)
+			do temp :: me.getStatus((timer - me.pivotTime) / me.oneRange)
+		else
+			do temp :: me.getStatus((timer - me.pivotTime) / me.oneRange % me.loopTime)
+		end if
+		
+		
+		if(temp[2] = -1)
+			ret {表示しない}
+		end if
+		
+		do me.image.drawScale((x + temp[0]) $ float, (y + temp[1]) $ float, me.haba $ float * 2.0, me.takasa $ float * 2.0, (me.haba * temp[2]) $ float, (me.takasa * temp[3]) $ float, me.haba $ float, me.takasa $ float, 0xFFFFFFFF)
+	end func
+	
+	func getStatus(frame: int): []int {位置x,y,n枚目,m列目 の順に記述}
+		throw 0xFF2
+	end func
+	
+	+func modeChange(in: int, timer: int)
+		do me.mode :: in
+		do me.pivotTime :: timer
+	end func
+	
+end class
+
+class RingB(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 50
+		do me.loopTime :: 16
+		do me.image :: draw@makeTex("res/neko/ring_back_2.png")
+		do me.haba :: 256
+		do me.takasa :: 256
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, frame % 8, frame / 8]
+	end func
+end class
+
+class RingF(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 50
+		do me.loopTime :: 16
+		do me.image :: draw@makeTex("res/neko/ring_front_2.png")
+		do me.haba :: 256
+		do me.takasa :: 256
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, frame % 8, frame / 8]
+	end func
+end class
+
+class Body(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 1
+		do me.loopTime :: 2
+		do me.image :: draw@makeTex("res/neko/body_22.png")
+		do me.haba :: 256
+		do me.takasa :: 256
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, 0, 0]
+	end func
+end class
+
+class Light(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 50
+		do me.loopTime :: 16
+		do me.image :: draw@makeTex("res/neko/body_light_3.png")
+		do me.haba :: 256
+		do me.takasa :: 256
+	end func
+	*func getStatus(frame: int): []int
+		switch(me.mode)
+		case 0 {通常時}
+			ret[0, 0, frame % 8, frame / 8]
+		case 1 {ダメージ}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 0
+			end if
+			ret[0, 0, frame % 8, 2]
+		end switch
+		
+	end func
+end class
+
+class Pi(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 50
+		do me.loopTime :: 8
+		do me.image :: draw@makeTex("res/neko/body_pi.png")
+		do me.haba :: 64
+		do me.takasa :: 32
+	end func
+	*func getStatus(frame: int): []int
+		switch(me.mode)
+		case 0 {通常}
+			ret[0, 0, 0, 0]
+		case 1 {ダメージ}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 0
+			end if
+			ret[0, 0, frame, 0]
+		case 2 {通常小}
+			ret[0, 0, 0, 1]
+		case 3 {ダメージ小}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 2
+			end if
+			ret[0, 0, frame, 1]
+		case 4 {通常}
+			ret[0, 0, 0, 2]
+		case 5 {ダメージ}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 4
+			end if
+			ret[0, 0, frame, 2]
+		case 6 {通常}
+			ret[0, 0, 0, 3]
+		case 7 {ダメージ}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 6
+			end if
+			ret[0, 0, frame, 3]
+		end switch
+	end func
+end class
+
+class Head(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 80
+		do me.loopTime :: 8
+		do me.image :: draw@makeTex("res/neko/body_head.png")
+		do me.haba :: 80
+		do me.takasa :: 80
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, frame, 0]
+	end func
+end class
+
+class Mayu(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 1
+		do me.loopTime :: 8
+		do me.image :: draw@makeTex("res/neko/face_mayu.png")
+		do me.haba :: 48
+		do me.takasa :: 16
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, me.mode, 0]
+	end func
+	{
+0楽1むっ2悲3真顔4やだー
+5なんやと6にゃーっ！7ドユコト？
+	}
+end class
+
+class Eye(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 80
+		do me.loopTime :: 8
+		do me.image :: draw@makeTex("res/neko/face_f_1_16.png")
+		do me.haba :: 48
+		do me.takasa :: 48
+	end func
+	*func getStatus(frame: int): []int
+		switch(me.mode)
+		case 0 {通常時}
+			ret[0, 0, 0, 0]
+		case 1 {まばたき}
+			if(frame >= 5)
+				do frame :: 5
+				do me.mode :: 0
+			end if
+			ret[0, 0, frame % 6, 0]
+		case 2 {目きらきら}
+			ret[0, 0, frame % 8, 1]
+		case 3 {ダメージ}
+			if(frame >= 7)
+				do frame :: 7
+				do me.mode :: 0
+			end if
+			ret[0, 0, frame % 8, 2]
+		case 7 {棒目}
+			ret[0, 0, 0, 7]
+		case 8 {じと目}
+			ret[0, 0, 2, 7]
+		case 9 {じとじと目}
+			ret[0, 0, 3, 7]
+		case 10 to 19 {まばたき、戻り対応}
+			if(frame >= 5)
+				do frame :: 5
+				do me.mode :- 10
+			end if
+			ret[0, 0, frame % 6, 0]
+		end switch
+	end func
+	+func mabataki(time: int)
+		switch(me.mode)
+		case 0, 2, 3
+			do me.modeChange(me.mode + 10, time)
+		end switch
+	end func
+end class
+
+class Mouth(@syncAnimation)
+	*func ctor()
+		do me.oneRange :: 1
+		do me.loopTime :: 8
+		do me.image :: draw@makeTex("res/neko/face_mouth.png")
+		do me.haba :: 48
+		do me.takasa :: 16
+	end func
+	*func getStatus(frame: int): []int
+		ret[0, 0, me.mode, 0]
+	end func
+	{
+0ふん1わー2にやり3お4だいじょうぶ？
+5にがて6ふふん7むー
+	}
+end class

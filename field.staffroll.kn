@@ -1,0 +1,28 @@
+class StaffRoll()
+	var font1: \font@FontBC
+	var handle: file@Reader
+	var staffs: [][]char
+	var long: int
+	*func ctor()
+		do me.font1 :: #\font@FontBC
+		do me.handle :: file@makeReader("res/staffs.txt")
+		do me.staffs :: #[100][]char
+		
+		do me.handle.delimiter(['\n', ','])
+		
+		var counter: int :: 0
+		while(me.handle.term() = false)
+			do me.staffs[counter] :: me.handle.readStr()
+			do counter :+ 1
+		end while
+		do me.long :: counter
+	end func
+	
+	+func mes(x: int, y: int)
+		for i(0, me.long - 1)
+			do me.font1.mesTomei(me.staffs[i], x, y + i * 32)
+		end for
+		;do me.font1.mes("TEST", x, y)
+	end func
+	
+end class

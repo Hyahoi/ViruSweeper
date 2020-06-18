@@ -1,0 +1,556 @@
+var wndMain: wnd@Wnd
+var drawMain: wnd@Draw
+
+var ranking: \ranking@Ranking
+var bakuhatsu: bool :: false {YABAIモードが開放されているか}
+;var osiri: snd@Snd
+var backImage: []draw@Tex
+var pastImageID: int
+var imageChangeTime: int
+const fadeLength: float :: 1.0
+const canDebug: bool :: true
+
+
+func main()
+	
+	do @wndMain :: wnd@makeWnd(null, %aspect, 1280, 960, "ViruSweeper")
+	do @drawMain :: wnd@makeDraw(@wndMain, 0, 0, 1280, 960, %scale, %scale, false)
+	
+	func wndMainOnPushMenu(wnd: wnd@WndBase, id: int)
+		switch(id)
+		case 0x0001 {Exit}
+			do @wndMain.close() {ウインドウを閉じる}
+		case 0x1001
+			do input@setCfgKey(0, %a, [getKey()])
+			do wnd@msgBox(@wndMain, "Complete!", "config", %info, %ok)
+		case 0x1002
+			do input@setCfgKey(0, %b, [getKey()])
+			do wnd@msgBox(@wndMain, "Complete!", "config", %info, %ok)
+		case 0x1003
+			do input@setCfgKey(0, %c, [getKey()])
+			do wnd@msgBox(@wndMain, "Complete!", "config", %info, %ok)
+		case 0x1004
+			do input@setCfgKey(0, %r, [getKey()])
+			do wnd@msgBox(@wndMain, "Complete!", "config", %info, %ok)
+		case 0x1005
+			do input@setCfgKey(0, %e, [getKey()])
+			do wnd@msgBox(@wndMain, "Complete!", "config", %info, %ok)
+		end switch
+		
+		func getKey(): input@Key
+			while loop(wnd@act())
+				for i(1, 100)
+					if(input@key(i $ input@Key))
+						ret i $ input@Key
+					end if
+				end for
+			end while
+		end func
+	end func
+	do @wndMain.onPushMenu :: wndMainOnPushMenu {メニューが選択されたときのイベントを登録}
+	; メニューの作成
+	var menuMain: wnd@Menu :: wnd@makeMenu()
+	var popupMainFile: wnd@Popup :: wnd@makePopup()
+	do menuMain.addPopup("S&ystem", popupMainFile)
+	do popupMainFile.add(0x0001, "E&xit")
+	var popupMainHelp: wnd@Popup :: wnd@makePopup()
+	do menuMain.addPopup("C&onfig", popupMainHelp)
+	do popupMainHelp.add(0x1001, "A&")
+	do popupMainHelp.add(0x1002, "B&")
+	do popupMainHelp.add(0x1003, "C&")
+	do popupMainHelp.add(0x1004, "S&hift")
+	do popupMainHelp.add(0x1005, "E&nter")
+	; メニューの登録
+	do @wndMain.setMenu(menuMain)
+	
+	do input@setCfgKey(0, %r, [%shiftL $ input@Key, %shiftR, %s])
+	do input@setCfgKey(0, %menu, [%esc $ input@Key, %r])
+	do input@setCfgKey(0, %a, [%z $ input@Key])
+	do input@setCfgKey(0, %e, [%enter $ input@Key])
+	do input@setCfg(0, %r, 5)
+	do input@setCfg(0, %e, 7)
+	
+	
+	do snd@setMainVolume(0.8)
+	
+	do draw@sampler(%point)
+	
+	do @ranking :: #\ranking@Ranking
+	do @ranking.defaultScore()
+	do ogg@init()
+	;do @osiri :: snd@makeSnd("res/osiri.ogg", true)
+	
+	do @gameOpening()
+	while(@gameMain() {ゲーム本編}=917) {Escでコンティニュー}
+		;do @osiri.stop()
+	end while
+	
+	
+	
+end func
+
+func gameOpening()
+	var logo: draw@Tex :: draw@makeTex("res/nonlinear.png")
+	for i(0, 180)
+		do draw@rect(0.0, 0.0, 1280.0, 960.0, 0xFFFFFFFF)
+		do logo.draw(240.0, 370.0, 0.0, 0.0, 800.0, 219.0, 0xFFFFFFFF)
+		var fade: int :: 0x01000000 * (255 * (i - 120).clampMin(0) / 60)
+		do draw@rect(0.0, 0.0, 1280.0, 960.0, 0x00000000 + fade)
+		do draw@render(60)
+		do wnd@act()
+		if(input@pad(0, %a) = 1)
+			break i
+		end if
+	end for
+end func
+
+func gameMain(): int
+	var field: \field@Field :: #\field@Field
+	do field.posSet(64, 16 * 4)
+	
+	var das: @DAS :: #@DAS
+	
+	var coin: snd@Snd :: snd@makeSnd("res/decision21.wav", false)
+	do coin.volume(0.8)
+	var bombSE: snd@Snd :: snd@makeSnd("res/bomb1.wav", false)
+	do bombSE.volume(0.8)
+	var seikaiSE: snd@Snd :: snd@makeSnd("res/chime00.wav", false)
+	do seikaiSE.volume(0.8)
+	var otete: \animation@Arrow :: #\animation@Arrow
+	
+	do @backImage :: #[10]draw@Tex
+	for i(0, 9)
+		do @backImage[i] :: draw@makeTex("res/back(\{i}).jpg")
+	end for
+	func backDraw(field: \field@Field)
+		var next: int :: field.backgroundType()
+		if(next = @pastImageID)
+			do @backImage[field.backgroundType()].drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+			do @imageChangeTime :: lib@sysTime()
+		else
+			var sa: float :: (lib@sysTime() - @imageChangeTime) $ float / 1000.0
+			switch(sa)
+			case 0.0 to @fadeLength
+				do @backImage[@pastImageID].drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF - ((sa / @fadeLength * 255.0) $ int).clamp(0, 255) * 0x01000000)
+			case @fadeLength to @fadeLength * 2.0
+				do @backImage[next].drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0x00FFFFFF + (((sa - @fadeLength) / @fadeLength * 255.0) $ int).clamp(0, 255) * 0x01000000)
+			case @fadeLength * 2.0 to 1000.0
+				do @backImage[next].drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+				do @pastImageID :: next
+			end switch
+		end if
+		
+	end func
+	
+	;var backImage: draw@Tex :: draw@makeTex("res/back(9).jpg")
+	;var gameOver: draw@Tex :: draw@makeTex("res/gameOver.png")
+	var gameOverAni: \animation@GameOver :: #\animation@GameOver
+	var allClearImage: draw@Tex :: draw@makeTex("res/allClear.png")
+	var deathSE: snd@Snd :: snd@makeSnd("res/strike1.wav", false)
+	do deathSE.volume(0.8)
+	var masu: draw@Tex :: draw@makeTex("res/cursor.png")
+	
+	var backRed: \fade_screen@fadeScreen :: #\fade_screen@fadeScreen
+	
+	var scrollNum: float :: 0.0 {スクロール内部タイマー,0から増加}
+	var scrollBorder: float :: 256.0 {スクロール閾値}
+	;var scrollSpeeds: []int :: [1, 2, 4, 8, 16, 32, 64, 128, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256]
+	;128…ギリ
+	
+	var canMove: []bool :: [true, true]
+	
+	var dead: bool :: false
+	var deadAnimation: int :: 360
+	
+	var allClear: bool :: false
+	var allClearAnimation: int :: 300
+	
+	;var clear: bool :: false
+	;var clearAnimation: int :: 300
+	
+	var debugVar: bool
+	var debugTimer: int
+	var debugFlag: int
+	
+	;var credit: int :: 0
+	
+	
+	
+	while wait(wnd@act())
+		if(input@pad(0, %e) = 1)
+			do coin.play()
+			break wait
+		end if
+		;do backImage.drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+		do backDraw(field)
+		do field.allDraw()
+		
+		do @ranking.show()
+		
+		do field.uiShow(0)
+		;do canMove :: field.showUpper()
+		;do otete.show(0, 96)
+		do draw@render(60)
+	end while
+	do field.mPlay(2) {音楽、再生w}
+	var isOK: bool :: false
+	while(isOK = false)
+		
+		block a
+			var cursorDAS: int :: 0
+			while controlSelect(wnd@act())
+				if(input@pad(0, %e) = 1 | input@pad(0, %a) = 1)
+					do coin.play()
+					do das.set(cursorDAS)
+					break controlSelect
+				end if
+				;do backImage.drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+				do backDraw(field)
+				do field.allDraw()
+				do field.uiShow(1)
+				if(input@pad(0, %up) = 1)
+					do cursorDAS :: (cursorDAS + 3 - 1) % 3
+				end if
+				if(input@pad(0, %down) = 1)
+					do cursorDAS :: (cursorDAS + 3 + 1) % 3
+				end if
+				do otete.show(64 * 2 + 32, 64 * 2 + 32 * 5 + cursorDAS * 64)
+				
+				do @ranking.show()
+				do draw@render(60)
+			end while
+		end block
+		
+		block b
+			var cursorDifficulty: int :: 0
+			var limit: int :: 1
+			var limitHP: int :: 10
+			if(@bakuhatsu)
+				do limit :: 2
+				do limitHP :: -10
+			end if
+			while controlSelect(wnd@act())
+				if(input@pad(0, %e) = 1 | input@pad(0, %a) = 1)
+					do coin.play()
+					do field.setDifficulty(cursorDifficulty)
+					do isOK :: true
+					break controlSelect
+				end if
+				if(input@pad(0, %b) = 1)
+					break controlSelect
+				end if
+				;do backImage.drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+				do backDraw(field)
+				do field.allDraw()
+				switch(limit)
+				case 1
+					do field.uiShow(2)
+				case 2
+					do field.uiShow(4)
+				end switch
+				if(input@pad(0, %up) = 1)
+					;do cursorDifficulty :: (cursorDifficulty + 2 - 1) % 2
+					do cursorDifficulty :: (cursorDifficulty - 1).clamp(0, limit)
+				end if
+				if(input@pad(0, %down) = 1)
+					;do cursorDifficulty :: (cursorDifficulty + 2 + 1) % 2
+					if(cursorDifficulty = 1)
+						do limitHP :- 1
+						if(limitHP = 0)
+							do limit :: 2
+							do bombSE.play() {YABAI開放}
+							do seikaiSE.play()
+							do @bakuhatsu :: true
+						end if
+					end if
+					do cursorDifficulty :: (cursorDifficulty + 1).clamp(0, limit)
+				end if
+				do otete.show(64 * 2 + 32, 64 * 2 + 32 * 5 + cursorDifficulty * 64)
+				
+				do @ranking.show()
+				do draw@render(60)
+			end while
+		end block
+	end while
+	
+	do field.mStop()
+	do field.mPlay(0) {音楽、再生w}
+	do field.startFunctions()
+	;do field.realTimerReset()
+	
+	var before: int :: lib@sysTime()
+	var after: int :: 0
+	var deltaTime: float :: 0.0
+	
+	while play(wnd@act())
+		
+		if(canMove[0])
+			;一般の動作
+			do field.timerAdvance()
+			do scrollNum :+ field.getSPD() $ float * 60.0 * deltaTime
+			while(scrollBorder <= scrollNum)
+				do scrollNum :- scrollBorder
+				do field.scrolling()
+			end while
+			if(canMove[1])
+				;一般の操作
+				if(input@pad(0, %r) >= 1) {shift状態かそうでないかで分岐する}
+					if(input@pad(0, %right) = 1)
+						do field.shift(1)
+					end if
+					if(input@pad(0, %left) = 1)
+						do field.shift(-1)
+					end if {上下移動できないようにする}
+				else
+					if(das.das(input@pad(0, %right)))
+						do field.curMove(1, 0)
+					end if
+					if(das.das(input@pad(0, %left)))
+						do field.curMove(-1, 0)
+					end if
+					if(das.das(input@pad(0, %up)))
+						do field.curMove(0, -1)
+					end if
+					if(das.das(input@pad(0, %down)))
+						do field.curMove(0, 1)
+					end if
+				end if
+				
+				if(input@pad(0, %a) = 1)
+					do field.decisionA()
+				end if
+				if(input@pad(0, %b) = 1)
+					do field.decisionB()
+				end if
+				if(input@pad(0, %c) >= 1)
+					do scrollNum :+ 256.0 * 60.0 * deltaTime
+					do field.postEvent(4)
+				end if
+				{
+				if(input@pad(0, %d) = 1)
+					;do field.tissaku()
+				end if
+				if(input@pad(0, %l) >= 1)
+					do scrollNum :+ 60.0 * 60.0 * deltaTime
+				end if
+				}
+			end if
+		end if
+		;ここから先は演出に関わらず普通に動く
+		
+		;ランキング設定終わったので出力します
+		if(input@pad(0, %menu) = 1 | @ranking.isComplete() = true)
+			do @ranking.set()
+			if(@canDebug)
+				do field.outputLogMes(@ranking.getLastName())
+			end if
+			ret 917
+		end if
+		;デバッグコマンド
+		;デバッグ用コマンド
+		do debugTimer :- 1
+		if(debugTimer = 0 & debugFlag < 5)
+			do debugFlag :: 0
+		end if
+		if(debugFlag = 0 & input@key(%d))
+			do debugFlag :: 1
+			do debugTimer :: 180
+		end if
+		if(debugFlag = 1 & input@key(%e))
+			do debugFlag :: 2
+		end if
+		if(debugFlag = 2 & input@key(%b))
+			do debugFlag :: 3
+		end if
+		if(debugFlag = 3 & input@key(%u))
+			do debugFlag :: 4
+		end if
+		if(debugFlag = 4 & input@key(%g) & @canDebug)
+			do debugFlag :: 5
+			var loginnedDebugMode: snd@Snd :: snd@makeSnd("res/voice024.wav", false)
+			do loginnedDebugMode.play()
+			do field.debug_life(1000)
+		end if
+		if(debugTimer = 0 & debugFlag >= 5)
+			do debugFlag :: 5
+		end if
+		if(debugFlag = 5 & input@key(%d))
+			do debugFlag :: 6
+			do debugTimer :: 180
+		end if
+		if(debugFlag = 6 & input@key(%e))
+			do debugFlag :: 7
+		end if
+		if(debugFlag = 7 & input@key(%b))
+			do debugFlag :: 8
+		end if
+		if(debugFlag = 8 & input@key(%u))
+			do debugFlag :: 9
+		end if
+		if(debugFlag = 9 & input@key(%g))
+			do debugFlag :: 0
+			var loginnedDebugMode: snd@Snd :: snd@makeSnd("res/voice024.wav", false)
+			do loginnedDebugMode.play()
+			do field.debug_life(1000)
+		end if
+		
+		if(debugFlag = 5)
+			if(input@pad(0, %r) = 1)
+				do field.debug_mes()
+			end if
+			if(input@pad(0, %l) = 1)
+				do field.mSetEND()
+			end if
+			if(input@pad(0, %c) >= 1)
+				do field.debug_clear()
+				do scrollNum :+ 256.0 * 16.0 * 60.0 * deltaTime
+			end if
+			if(input@pad(0, %d) = 1)
+				do field.debug_win()
+			end if
+			{if(input@key(%l))
+				do field.outputLogMes()
+			end if}
+		end if
+		
+		;描画するぜ～～～～
+		;do backImage.drawScale(0.0, 0.0, 1280.0, 960.0, 0.0, 0.0, 640.0, 480.0, 0xFFFFFFFF)
+		do backDraw(field)
+		switch(field.getLife())
+		case 0
+			do backRed.show(255)
+		case 1
+			do backRed.show(128)
+		case 2
+			do backRed.show(64)
+		default
+			do backRed.show(0)
+		end switch
+		
+		do field.allDraw()
+		if(input@pad(0, %r) >= 1)
+			do field.onShift()
+		end if
+		
+		;ゲームモードによる演出
+		;死
+		if(!dead & !allClear & (field.getGamemode() = 1 | field.getGamemode() = 4))
+			do dead :: true
+			do allClearAnimation :: -2
+		end if
+		if(dead = true & deadAnimation >= 0)
+			switch(deadAnimation)
+				;case 0 to 180
+				;	do gameOver.draw(96.0, 320.0, 0.0, 0.0, 386.0, 256.0, 0xFFFFFFFF)
+				;case 181 to 239
+				;	do gameOver.draw(96.0, 320.0 + 5.0 * (deadAnimation / 2 % 2) $ float, 0.0, 0.0, 386.0, 256.0, 0xFFFFFFFF)
+			case 0 to 299
+				do gameOverAni.show(128, 320)
+			case 300
+				do deathSE.play()
+			end switch
+			do deadAnimation :- 1
+		end if
+		if(dead = true & deadAnimation = -1)
+			do @ranking.post(field.getDefused(), field.getRealTime(), field.getDifficulty())
+			do deadAnimation :: -2
+			do field.mStop()
+			do field.mPlay(2)
+			;do @osiri.play()
+		end if
+		;完全クリア
+		if(!dead & !allClear & field.getGamemode() = 5)
+			do allClear :: true
+			do deadAnimation :: -2
+		end if
+		if(allClear = true & allClearAnimation >= 0)
+			switch(allClearAnimation)
+			case 0 to 180
+				do allClearImage.drawScale(128.0, 320.0, 352.0, 192.0, 0.0, 0.0, 176.0, 96.0, 0xFFFFFFFF)
+			case 181 to 239
+				do allClearImage.drawScale(128.0, 320.0 + 5.0 * (allClearAnimation / 2 % 2) $ float, 352.0, 192.0, 0.0, 0.0, 176.0, 96.0, 0xFFFFFFFF)
+			case 240
+				;do deathSE.play()
+			end switch
+			do allClearAnimation :- 1
+		end if
+		if(allClear = true & allClearAnimation = -1)
+			do @ranking.post(field.getDefused(), field.getRealTime(), field.getDifficulty())
+			do allClearAnimation :: -2
+			do field.mStop()
+			do field.mPlay(2)
+			;do @osiri.play()
+		end if
+		
+		;右側表示部分
+		if((dead | allClear) & deadAnimation < 0 & allClearAnimation < 0)
+			do @ranking.show()
+		else
+			do field.sideUIShow()
+		end if
+		
+		do canMove :: field.showUpper()
+		if(@ranking.isFixed() = false)
+			do canMove :: [false, false]
+		end if
+		switch(field.getGamemode())
+		case 1, 4, 5
+			do canMove :: [false, false]
+		case 3
+			do canMove :: [true, false]
+			
+		end switch
+		{
+		ret 4 {死亡しながら終わった}
+		ret 3 {エンディング中の死亡}
+		ret 5 {完全クリア}
+		ret 2 {エンディング面挑戦中}
+		ret 1 {普通の死亡}
+		ret 0 {通常面挑戦中}
+		}
+		
+		;do draw@rect(500.0, 200.0, 128.0 * 2.0, 256.0 * 2.0, 0xFFFF0000)
+		
+		;マス目確認用のマス
+		{
+		for i(0, 39)
+			for j(0, 29)
+				if(i % 10 = 0 & j % 10 = 0)
+					do masu.drawScale(i $ float * 32.0, j $ float * 32.0, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, 0xFFFF0000)
+				else
+					do masu.drawScale(i $ float * 32.0, j $ float * 32.0, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, 0xFFFFFFFF)
+				end if
+			end for
+		end for
+		}
+		do draw@render(60)
+		do after :: lib@sysTime()
+		do deltaTime :: (after - before) $ float / 1000.0
+		do before :: after
+		
+	end while
+end func
+class DAS()
+	var mode: int
+	+func set(num: int)
+		do me.mode :: num
+	end func
+	+func das(value: int): bool
+		switch(me.mode)
+		case 0
+			ret @DAS_(value, 20, 2)
+		case 1
+			ret @DAS_(value, 12, 2)
+		case 2
+			ret @DAS_(value, 9, 2)
+		end switch
+	end func
+end class
+func DAS_(value: int, onBorder: int, onInterval: int): bool
+	if(value = 1)
+		ret true
+	elif(value >= onBorder)
+		ret((value - onBorder) % onInterval = 0)
+	end if
+	ret false
+end func

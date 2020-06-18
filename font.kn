@@ -1,0 +1,206 @@
+class Font()
+	var image: draw@Tex
+	var model: []char
+	var kugiri: int
+	var haba: int
+	
+	var image_: draw@Tex
+	var model_: []char
+	var kugiri_: int
+	var haba_: int
+	
+	*func ctor()
+		;do image :: draw@makeTex("")
+	end func
+	
+	func filter(message: []char): []char
+		ret message
+	end func
+	func filter_(message: []char): []char
+		ret message
+	end func
+	
+	+func mes(message: []char, x: int, y: int)
+		do message :: me.filter(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri <= ^message)
+			do search :: message.sub(reading, me.kugiri)
+			do ASCII :: me.model.findStr(search, -1)
+			if(ASCII = -1) {見つからないなら別手段を用いる？}
+				do me.mes_(search.sub(0, me.kugiri_), x + me.haba * 2 * reading / me.kugiri, y)
+				do reading :+ me.kugiri_
+			else {通常}
+				do me.image.drawScale(x $ float + (me.haba * 2 * reading / me.kugiri) $ float, y $ float, (me.haba * 2) $ float, 32.0, (me.haba * ASCII / me.kugiri) $ float, 0.0, me.haba $ float, 16.0, 0xFFFFFFFF)
+				do reading :+ me.kugiri
+			end if
+		end while
+		;余りぶんも描画
+		if(^message - reading > 0)
+			do search :: message.sub(reading, ^message - reading)
+			do me.mes_(search, x + me.haba * 2 * reading / me.kugiri, y)
+		end if
+	end func
+	+func mes_(message: []char, x: int, y: int)
+		do message :: me.filter_(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri_ <= ^message)
+			do search :: message.sub(reading, me.kugiri_)
+			do ASCII :: me.model_.findStr(search, -1)
+			do me.image_.drawScale(x $ float + (me.haba_ * 2 * reading / me.kugiri_) $ float, y $ float, (me.haba_ * 2) $ float, 32.0, (me.haba_ * ASCII / me.kugiri_) $ float, 0.0, me.haba_ $ float, 16.0, 0xFFFFFFFF)
+			do reading :+ me.kugiri_
+		end while
+	end func
+	+func mesTomei(message: []char, x: int, y: int) {たしかスタッフロール用だった気がする}
+		do message :: me.filter(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri <= ^message)
+			do search :: message.sub(reading, me.kugiri)
+			do ASCII :: me.model.findStr(search, -1)
+			do me.image.drawScale(x $ float + (me.haba * 2 * reading / me.kugiri) $ float, y $ float, (me.haba * 2) $ float, 32.0, (me.haba * ASCII / me.kugiri) $ float, 0.0, me.haba $ float, 16.0, 0xA0FFFFFF)
+			do reading :+ me.kugiri
+		end while
+	end func
+	+func mesTomei_(message: []char, x: int, y: int) {スコア加算演出用}
+		do message :: me.filter_(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri_ <= ^message)
+			do search :: message.sub(reading, me.kugiri_)
+			do ASCII :: me.model_.findStr(search, -1)
+			do me.image_.drawScale(x $ float + (me.haba_ * 2 * reading / me.kugiri_) $ float, y $ float, (me.haba_ * 2) $ float, 32.0, (me.haba_ * ASCII / me.kugiri_) $ float, 0.0, me.haba_ $ float, 16.0, 0xA0FFFFFF)
+			do reading :+ me.kugiri_
+		end while
+	end func
+	
+	+func mesMigi(message: []char, x: int, y: int)
+		do message :: me.filter(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri <= ^message)
+			do search :: message.sub(^message - me.kugiri - reading, me.kugiri)
+			do ASCII :: me.model.findStr(search, -1)
+			if(ASCII = -1) {見つからないなら別手段を用いる？}
+				do me.mes_(search.sub(0, me.kugiri_), x + me.haba * 2 * reading / me.kugiri, y)
+				do reading :+ me.kugiri_
+			else {通常}
+				do me.image.drawScale(x $ float - (me.haba * 2 * (reading / me.kugiri + 1)) $ float, y $ float, (me.haba * 2) $ float, 32.0, (me.haba * ASCII / me.kugiri) $ float, 0.0, me.haba $ float, 16.0, 0xFFFFFFFF)
+				do reading :+ me.kugiri
+			end if
+		end while
+		;余りぶんも描画
+		if(^message - reading > 0)
+			do search :: message.sub(reading, ^message - reading)
+			do me.mes_(search, x + me.haba * 2 * reading / me.kugiri, y)
+		end if
+	end func
+	
+	+func mesMigizoroe(message: []char, x: int, y: int)
+		do me.mes(message, x - ^message / me.kugiri_ * me.haba_ * 2, y)
+	end func
+	
+end class
+
+class Font1(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font1.png")
+		do me.model :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZde."
+		do me.kugiri :: 1
+		do me.haba :: 16
+	end func
+end class
+
+class Font2(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font2.png")
+		do me.model :: "NOW_NEXTBOMBSPED/200_1_2_4_816243248_61218203036404280__/"
+		do me.kugiri :: 2
+		do me.haba :: 16
+	end func
+end class
+
+class Font3(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font3.png")
+		do me.model :: "NOnebosp><."
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+	*func filter(message: []char): []char
+		ret message.replace("/200", ">").replace("/180", "<")
+	end func
+end class
+
+class Font4(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font3.png")
+		do me.model :: "NOW*NEXTBOMBSPED/***/***_.0123456789"
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+end class
+
++class FontTag(@Font) {Ranking Tag}
+	*func ctor()
+		do me.image :: draw@makeTex("res/rankingtag.png")
+		do me.model :: "RNST_"
+		do me.kugiri :: 1
+		do me.haba :: 48
+	end func
+end class
++class FontBN(@Font) {Blue Number}
+	*func ctor()
+		do me.image :: draw@makeTex("res/font_bn.png")
+		do me.model :: "0123456789._"
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+end class
+
++class FontWN(@Font) {Water Number}
+	*func ctor()
+		do me.image :: draw@makeTex("res/font_wn.png")
+		do me.model :: "0123456789._"
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+end class
+
++class FontBC(@Font) {Blue Character}
+	*func ctor()
+		do me.image :: draw@makeTex("res/font_bc.png")
+		do me.model :: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789de_"
+		do me.kugiri :: 1
+		do me.haba :: 16
+	end func
+end class
+
++class FontGT(@Font) {Green Tag}
+	*func ctor()
+		do me.image :: draw@makeTex("res/font_gt.png")
+		do me.model :: "NOW*NEXTBOMBSPD*CELL__"
+		do me.kugiri :: 2
+		do me.haba :: 16
+		
+		do me.image_ :: draw@makeTex("res/font_gn.png")
+		do me.model_ :: "/:.0123456789+_"
+		do me.kugiri_ :: 1
+		do me.haba_ :: 8
+	end func
+end class
+
++class FontHR(@Font) {HIRAGANA}
+	*func ctor()
+		do me.image :: draw@makeTex("res/font_hr.png")
+		do me.model :: "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゐゆゑよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽぁぃぅぇぉっゃゅょ・０、。！？「」ー～ヒャ　"
+		do me.kugiri :: 1
+		do me.haba :: 16
+	end func
+end class

@@ -1,0 +1,250 @@
+{
+	アニメイシヨン仕様書
+	このクラスは複数枚の画像を一定の規則に従って表示するときにかんたんに書くためのものです。
+-----------------------------------------------------------
+	<あたらしくつくりたい>
+	文末に
++class Hogehoge(@Animation)
+内容
+end class
+	として追加してください。
+	内容にはctorとgetStatusを追加してください。
+	しないままだとエラー（FF1~FF2）を投げるようにしています。
+	あとはArrowを参考にすれば使い方がわかるはず。
+----------------------------------------------------------
+	<つくりかた>
+	ctorは初期化したときにするものです。一通りの変数の中身を決定してください。
+	oneRange: 1単位をどれだけの長さにするか。Arrowでは5フレームごとに状態が変わるので5を入れています。
+	loopTime: 1ループの間にある状態の数です。Arrowでは6状態（重複込み）あるので6を入れています。
+	image: 用いる画像データです。いい感じにやってくれるので例にならって場所だけ書き込みましょう。
+	haba: 用いる画像データが1単位につき16x16を使うなら16を、32x32なら32を代入します。
+			まだ正方形のアニメーションにしか対応してないから1つしか要求しません。そのうち追記します。
+	isLoop: ループするかどうかをfalseまたはtrueで示します。
+	
+	getStatusはどの画像をどの位置に表示するかを書く場所です。
+	int型（整数）の並びで指定してください。
+ret [a,b,c]
+	のようにして指定します。
+	a: x座標のずれ。
+	b: y座標のずれ。Arrowでは上下にゆれるのでこれを変化させています。
+	c: 画像の指定。左端から0,1,2...と番号がついているのでそれで指定してください。表示させたくない場合は-1を指定してください。
+	便利な構文として。
+switch(frame)
+case a to b
+処理1
+default
+処理2
+end switch
+	とかくとframe(oneRangeですでに割られたもの)別に処理を分けることができます。
+	この場合a <= frame <= bのとき処理1が行われます。
+	caseは複数並べることができます。
+	どのcaseにも当てはまらない場合defaultのあとの処理2が行われます。
+-------------------------------------------------------------------
+	<つかいかた>
+show(x,y)
+	とするとx,yを基準位置としてアニメーションが表示されます。
+pulse()
+	とするとアニメーションを初期状態に戻します。
+}
+
++class Animation()
+	var inTimer: int
+	var oneRange: int {アニメーション等倍}
+	var loopTime: int
+	var image: draw@Tex
+	var haba: int {画像幅 アニメーションのどの画像を用いるかに使う}
+	var takasa: int
+	var isLoop: bool
+	
+	{初期化不要}
+	var beforeTime: float
+	*func ctor()
+		throw 0xFF1
+	end func
+	+func show(x: int, y: int)
+		var temp: []int
+		if(me.isLoop = true)
+			do temp :: me.getStatus(me.inTimer / me.oneRange % me.loopTime)
+		else
+			do temp :: me.getStatus(me.inTimer / me.oneRange)
+		end if
+		
+		do me.inTimer :+ 1
+		if(temp[2] = -1)
+			ret {表示しない}
+		end if
+		if(me.takasa = 0)
+			do me.takasa :: me.haba
+		end if
+		do me.image.drawScale((x + temp[0]) $ float, (y + temp[1]) $ float, me.haba $ float * 2.0, me.takasa $ float * 2.0, (me.haba * temp[2]) $ float, 0.0, me.haba $ float, me.takasa $ float, 0xFFFFFFFF)
+	end func
+	
+	func getStatus(frame: int): []int {位置x,y,n枚目 の順に記述}
+		throw 0xFF2
+	end func
+	+func pulse()
+		do me.inTimer :: 0
+	end func
+	+func autoPulse(pos: float, bpm: int)
+		;var pos: float :: me.mGetPos()
+		var interval: float :: 60.0 / (bpm $ float)
+		if((me.beforeTime / interval) $ int <> (pos / interval) $ int)
+			do me.beforeTime :: pos
+			do me.pulse()
+		end if
+	end func
+end class
+
++class Arrow(@Animation)
+	*func ctor()
+		do me.oneRange :: 5
+		do me.loopTime :: 6
+		do me.image :: draw@makeTex("res/icons.png")
+		do me.haba :: 16
+		do me.isLoop :: true
+	end func
+	
+	*func getStatus(frame: int): []int
+		var takasa: int :: 0
+		switch(frame)
+		case 0
+			do takasa :: 0
+		case 1, 5
+			do takasa :: 1
+		case 2, 4
+			do takasa :: 2
+		case 3
+			do takasa :: 3
+		default
+			ret[0, 0, -1]
+		end switch
+		ret[0, takasa, 2]
+	end func
+end class
+
++class BeatCursor(@Animation)
+	*func ctor()
+		do me.oneRange :: 1
+		do me.loopTime :: -1
+		do me.image :: draw@makeTex("res/cursor3.png")
+		do me.haba :: 48
+		do me.isLoop :: false
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		switch(frame)
+		case 0 to 2
+			do maime :: 2
+		case 3 to 5
+			do maime :: 1
+		default
+			do maime :: 0
+		end switch
+		ret[0, 0, maime]
+	end func
+end class
+
++class PressEnter(@Animation)
+	*func ctor()
+		do me.oneRange :: 3
+		do me.loopTime :: 50
+		;全部で11枚
+		do me.image :: draw@makeTex("res/ani_press.png")
+		do me.haba :: 176
+		do me.takasa :: 96
+		do me.isLoop :: true
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		if(frame < 11)
+			do maime :: frame
+		end if
+		ret[0, 0, maime]
+	end func
+end class
+
++class GameOver(@Animation)
+	*func ctor()
+		do me.oneRange :: 5
+		do me.loopTime :: -1
+		;47枚
+		do me.image :: draw@makeTex("res/ani_gameOver.png")
+		do me.haba :: 160
+		do me.takasa :: 96
+		do me.isLoop :: false
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		switch(frame)
+		case 0 to 46
+			do maime :: frame
+		default
+			do maime :: 46
+		end switch
+		ret[0, 0, maime]
+	end func
+end class
+
++class Clear(@Animation)
+	*func ctor()
+		do me.oneRange :: 5
+		do me.loopTime :: 10
+		;47枚
+		do me.image :: draw@makeTex("res/ani_clear.png")
+		do me.haba :: 160
+		do me.takasa :: 320
+		do me.isLoop :: true
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		do maime :: frame
+		ret[0, 0, maime]
+	end func
+end class
+
++class Explosion(@Animation)
+	*func ctor()
+		do me.oneRange :: 5
+		do me.loopTime :: -1
+		;48*48の8枚
+		do me.image :: draw@makeTex("res/explosion.png")
+		do me.haba :: 48
+		do me.isLoop :: false
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		do maime :: frame
+		if(maime > 7)
+			do maime :: 7
+		end if
+		ret[0, 0, maime]
+	end func
+end class
+
++class Ranking(@Animation)
+	*func ctor()
+		do me.oneRange :: 5
+		do me.loopTime :: 36
+		;15枚
+		do me.image :: draw@makeTex("res/ani_ranking.png")
+		do me.haba :: 232
+		do me.takasa :: 48
+		do me.isLoop :: true
+	end func
+	
+	*func getStatus(frame: int): []int
+		var maime: int :: 0
+		switch(frame)
+		case 0 to 14
+			do maime :: frame
+		default
+			do maime :: 0
+		end switch
+		ret[0, 0, maime]
+	end func
+end class

@@ -1,0 +1,16 @@
++class fadeScreen()
+	var color: int
+	var alpha: int
+	*func ctor()
+		do me.color :: 0x00FFFFFF
+	end func
+	+func show(in_alpha: int)
+		do in_alpha :: in_alpha / 16 * 16
+		if(me.alpha < in_alpha)
+			do me.alpha :+ 16
+		elif(me.alpha > in_alpha)
+			do me.alpha :- 16
+		end if
+		do draw@rect(0.0, 0.0, 8000.0, 6000.0, 0x00FF0000 + 0x01000000 * me.alpha)
+	end func
+end class

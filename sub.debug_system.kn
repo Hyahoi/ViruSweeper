@@ -1,0 +1,30 @@
++class DebugConsole()
+	var moji: [][]char
+	+var pos: []int
+	var color: int
+	var font: draw@Font
+	
+	+func init(x: int, y: int, color: int)
+		do me.pos :: [x, y]
+		do me.color :: color
+		do me.font :: draw@makeFont(null, 12, false, false, true, 0.0)
+		do me.moji :: #[10][]char
+		do me.moji.fill("")
+	end func
+	
+	+func show(x: int)
+		do x.clamp(0, 9)
+		for i(0, x)
+			do me.font.draw(me.pos[0] $ float, me.pos[1] $ float + me.font.getHeight() * i $ float, me.moji[i], me.color)
+		end for
+	end func
+	
+	+func add(moji: []char)
+		for i(9, 1, -1)
+			do me.moji[i] :: me.moji[i - 1]
+		end for
+		do me.moji[0] :: moji
+	end func
+	
+	
+end class

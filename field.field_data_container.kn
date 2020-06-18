@@ -1,0 +1,372 @@
+class FDContainer() {数値的なことを扱う。つまりスクロールに関しては知らない。}
+	
+	var map: [][]int {見た目がどれか}
+	var mine: [][]int {地雷の有無}
+	var hidari: []int {どこに置くかも自由なのでどこか}
+	var haba: []int {幅変更を参照しやすくする}
+	
+	*func ctor()
+		do me.map :: #[10, 60]int
+		do me.mine :: #[10, 60]int
+		do me.hidari :: #[60]int
+		do me.haba :: #[60]int
+		do me.poisonList :: #queue<[]int>
+		do me.poisonList.add([-1, -1])
+	end func
+	
+	;ライン初期化
+	+func narrowMap(min: int, max: int, left: int, right: int)
+		for y(min, max)
+			var avoid: int :: lib@rnd(left, right)
+			for x(0, 9)
+				do me.postMap(x, y, -1)
+				do me.postMine(x, y, -1)
+			end for
+			for x(left, right)
+				do me.postMap(x, y, 0)
+				do me.postMine(x, y, 0)
+				if(x = avoid)
+					do me.mine[x][y] :: -1
+				end if
+			end for
+			do me.haba[y] :: right - left + 1
+			do me.hidari[y] :: left
+		end for
+	end func
+	
+	;////////////////////////////////////////////// G E T /////////////////////////////////////////////////
+	
+	;範囲外アクセスをしようとすると-1が返される。ちゃんと-1では処理を行わないようにすること
+	
+	func getMine(x: int, y: int): int {地雷の有無を確認}
+		if(x = x.clamp(0, 9) & y = y.clamp(0, 59))
+			ret me.mine[x][y]
+		elif(x = x.clamp(0, 9) & y > 59)
+			ret me.mine[x][y % 60]
+		end if
+		ret - 1
+	end func
+	
+	+func getMap(x: int, y: int): int {表面のマップチップを取得}
+		if(x = x.clamp(0, 9) & y = y.clamp(0, 59))
+			ret me.map[x][y]
+		elif(x = x.clamp(0, 9) & y > 59)
+			ret me.map[x][y % 60]
+		end if
+		ret - 1
+	end func
+	
+	;//////////////////////////////////////////////// P O S T ////////////////////////////////////////////////////////
+	
+	;y大きい方に範囲外なら割り切る。
+	;そういうのをいちいち書くのが面倒なので
+	;ファンクションを作ることにしたんだ
+	func postMine(x: int, y: int, value: int)
+		if(x = x.clamp(0, 9) & y = y.clamp(0, 59))
+			do me.mine[x][y] :: value
+		elif(x = x.clamp(0, 9) & y > 59)
+			do me.mine[x][y % 60] :: value
+		end if
+	end func
+	
+	func postMap(x: int, y: int, value: int)
+		if(x = x.clamp(0, 9) & y = y.clamp(0, 59))
+			do me.map[x][y] :: value
+		elif(x = x.clamp(0, 9) & y > 59)
+			do me.map[x][y % 60] :: value
+		end if
+	end func
+	
+	;////////////////////////////////////////// 便 利 関 数 ////////////////////////////////////////////////////////////
+	
+	;周りの地雷の数から数字を判断
+	func getNum(x: int, y: int): int
+		var counter: int :: 0
+		for i(-1, 1)
+			for j(-1, 1)
+				do counter :+ me.getMine(x + i, y + j) <> -1 ?(me.getMine(x + i, y + j), 0)
+			end for
+		end for
+		if(counter = 0)
+			ret - 6
+		end if
+		ret counter
+	end func
+	
+	+func lineCountMine(y: int): int {ヨコ数を計測}
+		var counter: int :: 0
+		for i(0, 9)
+			if(me.getMine(i, y) = 1)
+				do counter :+ 1
+			end if
+		end for
+		ret counter
+	end func
+	
+	+func lineCountFlag(y: int): int {フラグおいた数を計測}
+		var counter: int :: 0
+		for i(0, 9)
+			if(me.getMap(i, y) = 2)
+				do counter :+ 1
+			end if
+		end for
+		ret counter
+	end func
+	
+	+func lineCountUnopen(y: int): int {開かれていない数（フラグ立ってるのも含む）}
+		var counter: int :: 0
+		for i(0, 9)
+			if(me.getMap(i, y) = 0 | me.getMap(i, y) = 2)
+				do counter :+ 1
+			end if
+		end for
+		ret counter
+	end func
+	
+	;///////////////////////////////////////////////// 外 部 公 開 //////////////////////////////////////////////////
+	
+	+func lineProtect(y: int) {自動フラグ立て機能}
+		for i(0, 9)
+			if(me.getMap(i, y) = 0)
+				do me.postMap(i, y, 2)
+			end if
+		end for
+	end func
+	
+	+func isDone(y: int): bool {このラインは上にいっても問題ないですか？（偽）}
+		switch(me.lineCountMine(y) - me.lineCountFlag(y))
+		case -10 to - 1
+			ret false
+		case 0
+			ret true
+		case 1 to 10
+			if(me.lineCountMine(y) = me.lineCountUnopen(y))
+				ret true
+			end if
+			ret false
+		end switch
+		ret true
+	end func
+	
+	+func isClear(y: int): bool {このラインは上にいっても問題ないですか？（真）}
+		for i(0, 9)
+			if((me.getMap(i, y) = 0 & me.getMine(i, y) = 1) | (me.getMap(i, y) = 2 & me.getMine(i, y) = 0))
+				ret false
+			end if
+		end for
+		ret true
+	end func
+	
+	{形だけはカーソル移動に必要}
+	+func getHaba(y: int): int
+		ret me.haba[y % 60]
+	end func
+	+func getHidari(y: int): int
+		ret me.hidari[y % 60]
+	end func
+	
+	+func addMine(min: int, max: int, num: int) {地雷設置}
+		var safe: int :: 0
+		var safeList: [][]int :: #[400, 2]int
+		
+		for i(0, 9)
+			for j(min, max)
+				if(me.getMine(i, j) = 0)
+					do safeList[safe] :: [i, j]
+					do safe :+ 1
+				end if
+			end for
+		end for
+		
+		if(safe = 0 | safe < num)
+			throw 1 {すでに地雷で埋まっています！}
+		end if
+		var temp: [][]int :: #[safe, 2]int
+		for i(0, safe - 1)
+			do temp[i] :: safeList[i]
+		end for
+		do temp.shuffle()
+		for i(0, num - 1)
+			do me.postMine(temp[i][0], temp[i][1], 1)
+		end for
+	end func
+	
+	+func shift(x: int, y: int) {1づつしか動かすな}
+		var newLineMap: []int :: #[10]int
+		for i(0, 9)
+			do newLineMap[i] :: me.getMap((i - x + 10) % 10, y)
+		end for
+		if(newLineMap[me.getHidari(y)] = -1)
+			do newLineMap[me.getHidari(y)] :$ newLineMap[(me.getHidari(y) + me.getHaba(y)) % 10]
+		end if
+		if(newLineMap[me.getHidari(y) + me.getHaba(y) - 1] = -1)
+			do newLineMap[me.getHidari(y) + me.getHaba(y) - 1] :$ newLineMap[(me.getHidari(y) - 1 + 10) % 10]
+		end if
+		for i(0, 9)
+			do me.postMap(i, y, newLineMap[i])
+		end for
+		;地雷もね
+		var newLineMine: []int :: #[10]int
+		for i(0, 9)
+			do newLineMine[i] :: me.getMine((i - x + 10) % 10, y)
+		end for
+		if(newLineMine[me.getHidari(y)] = -1)
+			do newLineMine[me.getHidari(y)] :$ newLineMine[(me.getHidari(y) + me.getHaba(y)) % 10]
+		end if
+		if(newLineMine[me.getHidari(y) + me.getHaba(y) - 1] = -1)
+			do newLineMine[me.getHidari(y) + me.getHaba(y) - 1] :$ newLineMine[(me.getHidari(y) - 1 + 10) % 10]
+		end if
+		for i(0, 9)
+			do me.postMine(i, y, newLineMine[i])
+		end for
+		;更新
+		do me.lineUpdate(y)
+		do me.lineUpdate(y + 1)
+		do me.lineUpdate(y - 1)
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;do me.shiftSE.play()
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;do me.addStatus("shift", 1)
+	end func
+	
+	+func lineUpdate(y: int) {shiftなどにより状況が変わったときに更新する}
+		for x(0, 9)
+			switch(me.getMap(x, y))
+			case 1, 8 to 15
+				do me.postMap(x, y, me.getNum(x, y) + 7)
+			end switch
+		end for
+	end func
+	
+	+func lineUpdateUnvisible(y: int) {下の見える前の層を更新しておく}
+		for x(0, 9)
+			switch(me.getMap(x, y))
+			case 1, 8 to 15
+				do me.postMap(x, y, me.getNum(x, y) + 7)
+			end switch
+			if(me.getMap(x, y) = 1) {0が開封されていないことがあるのでパワーオープンする}
+				var flagCounter: int :: 0
+				for i(-1, 1)
+					for j(-1, 1)
+						if(me.getMap(x + i, y + j) = 2)
+							do flagCounter :+ 1
+						end if
+					end for
+				end for
+				if(0 = flagCounter)
+					var counter: int :: 0
+					for i(-1, 1)
+						for j(-1, 1)
+							do counter :+ me.open(x + i, y + j)
+						end for
+					end for
+					{if(counter >= 1)
+						do me.powerSE.play()
+					end if}
+				end if
+			end if
+		end for
+	end func
+	
+	+func open(x: int, y: int): int {オープン！！！！！開けなかったら0を返す}
+		var status: int :: me.getMap(x, y)
+		if((status = 0 | status = 5) {& me.life >= 0}) {開かれてないやつしか開けないよ}
+			switch(me.getMine(x, y))
+			case 0, -1
+				do status :: 7 + me.getNum(x, y)
+				do me.postMap(x, y, status)
+				if(status = 1)
+					for i(-1, 1)
+						for j(-1, 1)
+							do me.open(x + i, y + j)
+						end for
+					end for
+				end if
+				ret 1
+				
+				
+			case 1 {大爆発}
+				do status :: 6
+				do me.postMap(x, y, status)
+				do me.postMine(x, y, -1)
+				do me.lineUpdate(y)
+				do me.lineUpdate(y + 1)
+				do me.lineUpdate(y - 1)
+				do me.poisonList.add([x, y])
+				ret 3
+				
+			end switch
+			ret 2
+		end if
+		ret 0
+	end func
+	
+	+func powerOpen(x: int, y: int): int {爆発したら-1を返す}
+		var counter: int :: 0
+		if(me.getMap(x, y) >= 8) {1以上}
+			var flagCounter: int :: 0
+			for i(-1, 1)
+				for j(-1, 1)
+					if(me.getMap(x + i, y + j) = 2)
+						do flagCounter :+ 1
+					end if
+				end for
+			end for
+			if(me.getMap(x, y) - 7 = flagCounter)
+				
+				for i(-1, 1)
+					for j(-1, 1)
+						var temp: int :: me.open(x + i, y + j)
+						if(temp = 3)
+							ret - 1 {爆発}
+						else
+							do counter :+ temp
+						end if
+					end for
+				end for
+			end if
+		end if
+		if(me.getMap(x, y) = 1) {ゼロ}
+			var flagCounter: int :: 0
+			for i(-1, 1)
+				for j(-1, 1)
+					if(me.getMap(x + i, y + j) = 2)
+						do flagCounter :+ 1
+					end if
+				end for
+			end for
+			if(0 = flagCounter)
+				for i(-1, 1)
+					for j(-1, 1)
+						do counter :+ me.open(x + i, y + j)
+					end for
+				end for
+				
+			end if
+		end if
+		ret counter
+	end func
+	
+	+func powerOpen2(y: int): int
+		var counter: int :: 0
+		if(me.lineCountMine(y) = me.lineCountFlag(y))
+			for i(0, 9)
+				var temp: int :: me.open(i, y)
+				if(temp = 3)
+					ret - 1 {爆発}
+				else
+					do counter :+ temp
+				end if
+			end for
+		end if
+		ret counter
+	end func
+	
+	+func flag(x: int, y: int)
+		if(me.getMap(x, y) = 0)
+			do me.postMap(x, y, 2)
+		elif(me.getMap(x, y) = 2)
+			do me.postMap(x, y, 0)
+		end if
+	end func
+	;////////////////////////////////////////ボム周りmessage/////////////////////////////////////////////
+	+var poisonList: queue<[]int>
+end class

@@ -1,0 +1,215 @@
++class Ranking()
+	var font1: \font@FontBC
+	var fontTag: \font@FontTag
+	var fontBN: \font@FontBN
+	var fontWN: \font@FontWN
+	
+	var name: [][]char
+	var score: []int
+	var time: []float
+	var muzusa: []int
+	var mode: int {0受付,1ネームエントリー,2リセット待ち}
+	var editing: int
+	var moji: draw@Font
+	var title: draw@Tex
+	var circle: draw@Tex
+	var titleAni: \animation@Ranking
+	var icon: draw@Tex
+	var vocabulary: []char
+	var lastName: []char
+	
+	;入力関係
+	var cursor: int
+	var mojiIndex: int
+	var tempRank: int
+	
+	*func ctor()
+		do me.font1 :: #\font@FontBC
+		do me.fontTag :: #\font@FontTag
+		do me.fontBN :: #\font@FontBN
+		do me.fontWN :: #\font@FontWN
+		do me.name :: #[10, 3]char
+		do me.score :: #[10]int
+		do me.time :: #[10]float
+		do me.muzusa :: #[10]int
+		do me.moji :: draw@makeFont(null, 24, true, false, true, 0.0)
+		do me.title :: draw@makeTex("res/met_ranking.png")
+		do me.circle :: draw@makeTex("res/circle.png")
+		do me.titleAni :: #\animation@Ranking
+		;do me.icon :: draw@makeTex("res/timer.png")
+		do me.icon :: draw@makeTex("res/icons.png")
+		;do me.icon2 :: draw@makeTex("res/crown.png")
+		do me.vocabulary :: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789de" {38}
+		do me.lastName :: "NULL"
+	end func
+	
+	+func defaultScore()
+		do me.name :: ["AMT", "HYA", "NYA", "CAT", "SEN", "NON", "LIN", "EAR", "DOG", "ODG"]
+		do me.score :: [600, 160, 100, 80, 60, 40, 20, 10, 5, 1]
+		do me.time :: [1200.1, 600.2, 460.3, 380.4, 300.5, 180.6, 100.7, 40.8, 20.9, 500.0]
+		do me.muzusa :: [2, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+	end func
+	
+	+func post(num: int, speed: float, nanido: int)
+		do me.cursor :: 0
+		do me.mojiIndex :: 0
+		
+		var rank: int :: 10
+		for i(0, 9)
+			if(num > me.score[i] | (num = me.score[i] & speed < me.time[i])) {記録が勝っているのでそこの順位になる}
+				do rank :: i
+				break i
+			end if
+		end for
+		
+		if(rank <= 8) {9位以上でないと移動が発生しない}
+			for i(8, rank, -1)
+				do me.name[i + 1] :: me.name[i]
+				do me.score[i + 1] :: me.score[i]
+				do me.time[i + 1] :: me.time[i]
+			end for
+		end if
+		if(rank <= 9) {書き換え}
+			do me.score[rank] :: num
+			do me.time[rank] :: speed
+			do me.name[rank] :: ""
+			do me.muzusa[rank] :: nanido
+			do me.mode :: 1
+			do me.cursor :: 0
+			do me.mojiIndex :: 0
+		end if
+		
+		if(rank = 10) {書き換えなし}
+			do me.mode :: 2
+		end if
+		
+		do me.tempRank :: rank
+	end func
+	
+	+func show()
+		if(me.mode = 1)
+			do me.titleAni.show(640, 0)
+		else
+			do me.title.drawScale(640.0, 0.0, 464.0, 96.0, 0.0, 0.0, 232.0, 48.0, 0xFFFFFFFF)
+		end if
+		
+		;do me.fontTag.mes("RN", 640, 128)
+		do me.fontTag.mes("N", 736, 128)
+		do me.fontTag.mes("ST", 640 + 7 * 32, 128)
+		do me.icon.drawScale((640 + 12 * 32) $ float, 128.0, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, 0xFFFFFFFF)
+		
+		for i(0, 9)
+			{
+			do me.moji.draw(608.0, (i * 48) $ float + 160.0, "\{i + 1}", 0xFF00FFFF)
+			do me.font1.mes("\{me.name[i]}", 672, (i * 48) + 160)
+			do me.moji.draw(768.0, (i * 48) $ float + 160.0, "\{me.score[i]}", 0xFF00FFFF)
+			do me.moji.draw(864.0, (i * 48) $ float + 160.0, "\{me.time[i]}", 0xFF00FFFF)
+			}
+			if(i = 0)
+				do me.icon.drawScale(640.0, 192.0, 32.0, 32.0, 16.0, 0.0, 16.0, 16.0, 0xFFFFFFFF)
+			end if
+			do me.font1.mes("\{i + 1}", 640, 192 + i * 48)
+			
+			do me.font1.mes("\{me.name[i]}", 736, 192 + i * 48)
+			do me.fontWN.mesMigi("\{me.score[i]}", 928, 192 + i * 48)
+			do me.fontBN.mesMigi("\{me.time[i] $ int}", 1024, 192 + i * 48)
+			var temp: []char :: (me.time[i] % 1.0).toStr().replace("0.", "")
+			if(^temp > 2)
+				do temp :: temp.sub(0, 2)
+			end if
+			do me.fontBN.mes("." ~ temp, 1024, 192 + i * 48)
+			
+			var color: int
+			switch(me.muzusa[i])
+			case 0
+				do color :: 0xFF0ED600
+			case 1
+				do color :: 0xFFFFBB00
+			case 2
+				do color :: 0xFFDB4D00
+			end switch
+			do me.circle.drawScale(1088.0, 192.0 + i $ float * 48.0, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, color)
+			
+		end for
+		
+		if(me.mode = 1)
+			var delete: bool :: false
+			if(input@pad(0, %a) = 1)
+				switch(me.mojiIndex % 38)
+				case 36
+					do delete :: true
+				case 37
+					do me.lastName :: me.name[me.tempRank] {文字登録完了！履歴に残す}
+					do me.mode :: 2
+				default
+					switch(me.cursor)
+					case 0 to 1
+						do me.name[me.tempRank] :~ [me.vocabulary[me.mojiIndex]]
+						do me.cursor :+ 1
+					case 2
+						do me.name[me.tempRank] :~ [me.vocabulary[me.mojiIndex]]
+						do me.cursor :+ 1
+						do me.mojiIndex :: 37
+					end switch
+				end switch
+			end if
+			
+			if(input@pad(0, %b) = 1 | delete = true)
+				switch(me.cursor)
+				case 1
+					do me.name[me.tempRank] :: ""
+					do me.cursor :- 1
+				case 2
+					do me.name[me.tempRank] :: [me.name[me.tempRank][0]]
+					do me.cursor :- 1
+				case 3
+					do me.name[me.tempRank] :: [me.name[me.tempRank][0], me.name[me.tempRank][1]]
+					do me.cursor :- 1
+				end switch
+			end if
+			
+			if((@DAS(input@pad(0, %down), 20, 10) | @DAS(input@pad(0, %right), 20, 10)) & me.cursor < 3)
+				do me.mojiIndex :: (me.mojiIndex + 1) % 38
+			end if
+			if((@DAS(input@pad(0, %up), 20, 10) | @DAS(input@pad(0, %left), 20, 10)) & me.cursor < 3)
+				do me.mojiIndex :: (me.mojiIndex + 37) % 38
+			end if
+			;do me.moji.draw(672.0 + (24 * me.cursor) $ float, (me.tempRank * 48) $ float + 160.0, "_", 0xFF00FFFF)
+			;do me.moji.draw(672.0 + (24 * me.cursor) $ float, (me.tempRank * 48) $ float + 160.0, [me.vocabulary[me.mojiIndex]], 0xFF00FFFF)
+			do me.font1.mes("\{me.name[me.tempRank]}", 736, 192 + me.tempRank * 48)
+			do me.font1.mes("\{[me.vocabulary[me.mojiIndex]]}", 736 + 32 * me.cursor, 192 + me.tempRank * 48)
+		end if
+	end func
+	
+	+func isFixed(): bool
+		if(me.mode = 0)
+			ret true
+		end if
+		ret false
+	end func
+	
+	+func isComplete(): bool
+		if(me.mode = 2)
+			ret true
+		end if
+		ret false
+	end func
+	
+	+func getLastName(): []char
+		ret me.lastName
+	end func
+	
+	+func set()
+		do me.mode :: 0
+	end func
+	
+end class
+
+func DAS(value: int, onBorder: int, onInterval: int): bool
+	if(value = 1)
+		ret true
+	elif(value >= onBorder)
+		ret((value - onBorder) % onInterval = 0)
+	end if
+	ret false
+end func

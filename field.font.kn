@@ -1,0 +1,66 @@
+class Font()
+	var image: draw@Tex
+	var model: []char
+	var kugiri: int
+	var haba: int
+	*func ctor()
+		;do image :: draw@makeTex("")
+	end func
+	
+	func filter(message: []char): []char
+		ret message
+	end func
+	
+	+func mes(message: []char, x: int, y: int)
+		do message :: me.filter(message)
+		var reading: int :: 0
+		var ASCII: int :: 0
+		var search: []char
+		while(reading + me.kugiri <= ^message)
+			do search :: message.sub(reading, me.kugiri)
+			do ASCII :: me.model.findStr(search, -1)
+			do me.image.drawScale(x $ float + (me.haba * 2 * reading / me.kugiri) $ float, y $ float, (me.haba * 2) $ float, 32.0, (me.haba * ASCII / me.kugiri) $ float, 0.0, me.haba $ float, 16.0, 0xFFFFFFFF)
+			do reading :+ me.kugiri
+		end while
+		
+	end func
+end class
+
+class Font1(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font1.png")
+		do me.model :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZde."
+		do me.kugiri :: 1
+		do me.haba :: 16
+	end func
+end class
+
+class Font2(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font2.png")
+		do me.model :: "NOW_NEXTBOMBSPED/200_1_2_4_816243248_61218203036404280__/"
+		do me.kugiri :: 2
+		do me.haba :: 16
+	end func
+end class
+
+class Font3(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font3.png")
+		do me.model :: "NOnebosp><."
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+	*func filter(message: []char): []char
+		ret message.replace("/200", ">").replace("/180", "<")
+	end func
+end class
+
+class Font4(@Font)
+	*func ctor()
+		do me.image :: draw@makeTex("res/font3.png")
+		do me.model :: "NOW*NEXTBOMBSPED/***/***_.0123456789"
+		do me.kugiri :: 1
+		do me.haba :: 8
+	end func
+end class

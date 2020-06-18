@@ -1,0 +1,1212 @@
+include field_data_container
+include staffroll
+include upper_ui
+include side_ui
++class Field()
+	
+	var DB: @FDContainer
+	var staffRoll: @StaffRoll
+	var upperUI: @UpperUI
+	var sideUI: @SideUI
+	var font2: \font@FontGT
+	var tagFont: \font@FontTag
+	
+	var pos: []int {フィールドの座標}
+	var scroll: int {スクロールによるフィールド内部のタイルの移動を記録する}
+	var cPos: []int {カーソルの座標}
+	var cPosMin: int {カーソルの最大値とかは再利用するので参照しやすくしておきたい}
+	var cPosMax: int
+	var bImage: draw@Tex
+	var aImage: draw@Tex
+	var curImage: draw@Tex
+	var curAni: \animation@BeatCursor
+	var shiftImage: draw@Tex
+	var uiImage: draw@Tex
+	var EDImage: \animation@Clear
+	var lifeImage: draw@Tex
+	
+	var flagSE: snd@Snd
+	var powerSE: snd@Snd
+	var shiftSE: snd@Snd
+	var pipiSE: snd@Snd
+	var explosionSE: snd@Snd
+	var openSE: snd@Snd
+	var invalidSE: snd@Snd
+	var prayerSE: snd@Snd
+	var passedSE: snd@Snd
+	
+	var BGM: []snd@Snd
+	var bpm: []int
+	
+	var layerData: [][]int {地雷の数,広さ,スピード,深さ(0-99みたいに)}
+	var currentLayer: int
+	var decoNo: int
+	var decoRest: int
+	var decoStart: float
+	var zoom: float {見にくいねんズームさせろ}
+	var timerFont: draw@Font
+	var tempFont: draw@Font
+	var frameTime: int
+	var realStartTime: int
+	var life: int
+	var defused: int
+	+var loadCounter: int
+	
+	;カーソルを光らせる
+	;var beforeTime: float
+	;var curShineFrame: int
+	
+	;エンディング演出
+	var EDposy: int
+	var isED: bool
+	var isFinished: bool
+	const EDlimit: float :: 115.5
+	;var EDtimer: float
+	var frontBlack: \fade_screen@fadeOut
+	
+	;デバッグのための御一行
+	var status: dict<[]char, int>
+	var logMes: []char
+	var logOutputted: bool
+	+var onDeadPost: func<(int, float)>
+	
+	*func ctor() {初期化}
+		do me.difficulty :: 1
+		
+		do me.DB :: #@FDContainer
+		do me.staffRoll :: #@StaffRoll
+		do me.upperUI :: #@UpperUI
+		do me.sideUI :: #@SideUI
+		do me.font2 :: #\font@FontGT
+		do me.tagFont :: #\font@FontTag
+		do me.poisonManager :: #poisons
+		do me.pos :: [0, 0]
+		do me.cPos :: [4, 0]
+		do me.cPosMin :: 0
+		do me.cPosMax :: 19
+		do me.bImage :: draw@makeTex("res/sprites.png")
+		do me.aImage :: draw@makeTex("res/sprites_another.png")
+		do me.curImage :: draw@makeTex("res/cursor3.png")
+		do me.curAni :: #\animation@BeatCursor
+		do me.shiftImage :: draw@makeTex("res/shiftFrame2.png")
+		do me.uiImage :: draw@makeTex("res/UI.png")
+		do me.EDImage :: #\animation@Clear
+		do me.lifeImage :: draw@makeTex("res/life.png")
+		
+		do me.flagSE :: snd@makeSnd("res/flag.wav", false)
+		do me.flagSE.volume(0.8)
+		do me.powerSE :: snd@makeSnd("res/power.wav", false)
+		do me.powerSE.volume(0.8)
+		do me.shiftSE :: snd@makeSnd("res/shift.wav", false)
+		do me.pipiSE :: snd@makeSnd("res/pipi.wav", false)
+		do me.pipiSE.volume(0.8)
+		do me.explosionSE :: snd@makeSnd("res/bomb.wav", false)
+		do me.explosionSE.volume(0.8)
+		do me.openSE :: snd@makeSnd("res/pi67.wav", false)
+		do me.openSE.volume(0.8)
+		do me.invalidSE :: snd@makeSnd("res/noise09.wav", false)
+		do me.invalidSE.volume(0.8)
+		do me.prayerSE :: snd@makeSnd("res/prayer1.wav", false)
+		do me.prayerSE.volume(0.8)
+		do me.passedSE :: snd@makeSnd("res/coin07.wav", false)
+		do me.passedSE.volume(0.8)
+		do me.BGM :: #[4]snd@Snd
+		do me.BGM[0] :: snd@makeSnd("res/met.ogg", true)
+		do me.BGM[1] :: snd@makeSnd("res/satsui.ogg", true)
+		do me.BGM[2] :: snd@makeSnd("res/option.ogg", true)
+		do me.BGM[3] :: snd@makeSnd("res/ED.ogg", true)
+		do me.bpm :: #[4]int
+		do me.bpm :: [152, 173, 115, 75]
+		
+		do me.layerData :: #[3, 5]int
+		do me.loadCounter :: 0
+		do me.load(0)
+		do me.load(1)
+		do me.load(2)
+		;do me.level :: 5
+		;do me.dense :: 0.1
+		
+		do me.decoNo :: 0
+		do me.decoRest :: 0
+		do me.zoom :: 2.0
+		do me.timerFont :: draw@makeFont(null, 24, false, false, true, 0.0)
+		do me.tempFont :: draw@makeFont(null, 24, false, false, true, 0.0)
+		;do me.restTime :: 60 * 60
+		do me.frameTime :: 0
+		do me.realStartTime :: lib@sysTime()
+		
+		do me.life :: 3
+		
+		do me.EDposy :: 16 * 20 * 100
+		do me.isED :: false
+		do me.frontBlack :: #\fade_screen@fadeOut
+		
+		do me.status :: #dict<[]char, int>
+		do me.logMes :: ""
+		do me.logOutputted :: false
+		
+		;do me.isEasy :: false
+		
+	end func
+	
+	+func posSet(x: int, y: int) {フィールドの座標設定}
+		do me.pos :: [x, y]
+	end func
+	
+	+func startFunctions()
+		do me.realTimerReset()
+		do me.sideUI.eventPulse(1, me.life)
+	end func
+	
+	{
+	var isEasy: bool
+	+func enEasy()
+		do me.isEasy :: true
+		do me.loadCounter :: 1
+		do me.load(1)
+		do me.load(2)
+	end func
+}
+	var difficulty: int
+	+func setDifficulty(nanido: int)
+		do me.difficulty :: nanido
+		do me.loadCounter :: 1
+		do me.load(1)
+		do me.load(2)
+		do me.layerData[0][2] :: [4, 8, 256][me.difficulty]
+	end func
+	+func getDifficulty(): int
+		ret me.difficulty
+	end func
+	{あまてらす編集部}
+	func load(layer: int)
+		do me.currentLayer :: (layer + 1) % 3
+		;loadCounterによってどんなのを作るか決める
+		switch(me.loadCounter) {EDposをセット}
+		case 8
+			do me.EDposy :: 16 * 20 * 2 + me.scroll
+		end switch
+		;縦幅を計算
+		do me.layerData[layer][3] :: me.loadCounter * 100
+		do me.layerData[layer][4] :: me.loadCounter * 100 + 99
+		
+		
+		if(me.difficulty = 1) {                                                                    ハードモード}
+			;横幅
+			switch(me.loadCounter)
+			case 0
+				do me.DB.narrowMap(layer * 20, layer * 20, 4, 5)
+				do me.DB.narrowMap(layer * 20 + 1, layer * 20 + 1, 3, 6)
+				do me.DB.narrowMap(layer * 20 + 2, layer * 20 + 2, 2, 7)
+				do me.DB.narrowMap(layer * 20 + 3, layer * 20 + 19, 1, 8)
+				;do me.DB.narrowMap(layer * 20 + 4, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 2 + 4 + 6 + 8 + 8 * 16
+			default
+				do me.DB.narrowMap(layer * 20, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 10 * 20
+			end switch
+			;地雷割合
+			var dense: float :: 0.50
+			var mineNum: int :: 0
+			if(me.loadCounter = 0)
+				do dense :: 0.04
+				do mineNum :: (dense * 150.0) $ int
+				do me.DB.addMine(layer * 20 + 5, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			elif(me.loadCounter = 9)
+				do dense :: 0.05
+				do mineNum :: (dense * 150.0) $ int
+				do me.DB.addMine(layer * 20 + 5, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			else
+				switch(me.loadCounter)
+				case 1 to 2
+					do dense :: 0.10 * me.loadCounter $ float
+				case 3
+					do dense :: 0.30
+				case 4
+					do dense :: 0.10
+				case 5
+					do dense :: 0.20
+				case 6 to 7
+					do dense :: 0.15
+				case 8
+					do dense :: 0.0
+					;9は上に例外的にかいてあります
+				case 10
+					do dense :: 0.10
+				case 11
+					do dense :: 0.13
+				case 12
+					do dense :: 0.16
+				case 13 to 100
+					do dense :: 0.20
+				end switch
+				do dense :+ 0.001
+				do mineNum :: (dense * 200.0) $ int
+				do me.DB.addMine(layer * 20, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			end if
+			;speed
+			var speed: int :: 256
+			switch(me.loadCounter)
+			case 0
+				do speed :: 8
+			case 1
+				do speed :: 16
+			case 2
+				do speed :: 32
+			case 3
+				do speed :: 8
+			case 4
+				do speed :: 16
+			case 5
+				do speed :: 32
+			case 6
+				do speed :: 48
+			case 7
+				do speed :: 64
+			case 8
+				do speed :: 0
+			case 9 to 100
+				do speed :: 48
+			end switch
+			do me.layerData[layer][2] :: speed
+		end if
+		{                                                                                            ここからeasy設定}
+		if(me.difficulty = 0)
+			;横幅
+			switch(me.loadCounter)
+			case 0
+				do me.DB.narrowMap(layer * 20, layer * 20, 4, 5)
+				do me.DB.narrowMap(layer * 20 + 1, layer * 20 + 1, 3, 6)
+				do me.DB.narrowMap(layer * 20 + 2, layer * 20 + 2, 2, 7)
+				do me.DB.narrowMap(layer * 20 + 3, layer * 20 + 19, 1, 8)
+				;do me.DB.narrowMap(layer * 20 + 4, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 2 + 4 + 6 + 8 + 8 * 16
+			default
+				do me.DB.narrowMap(layer * 20, layer * 20 + 19, 1, 8)
+				do me.layerData[layer][1] :: 10 * 20
+			end switch
+			;地雷割合
+			var dense: float :: 0.50
+			var mineNum: int :: 0
+			switch(me.loadCounter)
+			case 1 to 2
+				do dense :: 0.080 * me.loadCounter $ float {0.08-0.16}
+			case 3
+				do dense :: 0.18
+			case 4
+				do dense :: 0.05
+			case 5 to 7
+				do dense :: 0.15
+			case 8
+				do dense :: 0.00
+			case 9 to 100
+				do dense :: 0.00
+			end switch
+			do dense :+ 0.001
+			do mineNum :: (dense * 200.0) $ int
+			do me.DB.addMine(layer * 20, layer * 20 + 18, mineNum)
+			do me.layerData[layer][0] :: mineNum
+			;speed
+			var speed: int :: 256
+			switch(me.loadCounter)
+			case 0
+				do speed :: 4
+			case 1
+				do speed :: 8
+			case 2
+				do speed :: 16
+			case 3
+				do speed :: 2
+			case 4
+				do speed :: 4
+			case 5
+				do speed :: 8
+			case 6
+				do speed :: 16
+			case 7
+				do speed :: 32
+			case 8
+				do speed :: 0
+			case 9 to 100
+				do speed :: 64
+			end switch
+			do me.layerData[layer][2] :: speed
+		end if
+		
+		if(me.difficulty = 2) {                                                                    インフェルノモード}
+			;横幅
+			switch(me.loadCounter)
+			case 0
+				do me.DB.narrowMap(layer * 20, layer * 20, 4, 5)
+				do me.DB.narrowMap(layer * 20 + 1, layer * 20 + 1, 3, 6)
+				do me.DB.narrowMap(layer * 20 + 2, layer * 20 + 2, 2, 7)
+				do me.DB.narrowMap(layer * 20 + 3, layer * 20 + 19, 1, 8)
+				;do me.DB.narrowMap(layer * 20 + 4, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 2 + 4 + 6 + 8 + 8 * 16
+			default
+				do me.DB.narrowMap(layer * 20, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 10 * 20
+			end switch
+			;地雷割合
+			var dense: float :: 0.50
+			var mineNum: int :: 0
+			if(me.loadCounter = 0)
+				do dense :: 0.04
+				do mineNum :: (dense * 150.0) $ int
+				do me.DB.addMine(layer * 20 + 5, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			elif(me.loadCounter = 9)
+				do dense :: 0.05
+				do mineNum :: (dense * 150.0) $ int
+				do me.DB.addMine(layer * 20 + 5, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			else
+				switch(me.loadCounter)
+				case 1 to 4
+					do dense :: 0.040 * me.loadCounter $ float {0.04-0.16}
+				case 5 to 7
+					do dense :: 0.15
+				case 8
+					do dense :: 0.0
+					;9は上に例外的にかいてあります
+				case 10 to 100
+					do dense :: 0.15
+				end switch
+				do dense :+ 0.001
+				do mineNum :: (dense * 200.0) $ int
+				do me.DB.addMine(layer * 20, layer * 20 + 18, mineNum)
+				do me.layerData[layer][0] :: mineNum
+			end if
+			;speed
+			var speed: int :: 256
+			switch(me.loadCounter)
+			case 0
+				do speed :: 256
+			case 1
+				do speed :: 192
+			case 2
+				do speed :: 160
+			case 3
+				do speed :: 128
+			case 4
+				do speed :: 32
+			case 5
+				do speed :: 96
+			case 6
+				do speed :: 96
+			case 7
+				do speed :: 128
+			case 8
+				do speed :: 0
+			case 9 to 100
+				do speed :: 64
+			end switch
+			do me.layerData[layer][2] :: speed
+		end if
+		
+		do me.loadCounter :+ 1
+		
+	end func
+	
+	;////////////////////////////////////////////////timer関係/////////////////////////////////////////
+	func realTimerReset()
+		do me.realStartTime :: lib@sysTime()
+	end func
+	+func timerAdvance()
+		if(me.life > 0)
+			do me.frameTime :+ 1
+		end if
+	end func
+	
+	func timerShow()
+		var temp: []char :: ((me.frameTime) $ float / 60.0).toStr()
+		do me.timerFont.draw((256.0 + me.pos[0] $ float) * me.zoom, (320.0 + me.pos[1] $ float) * me.zoom, "\{temp}", 0xFF00FF00)
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;リアル時間いれたい
+		{
+		if(me.decoTimer = 0)
+			do me.decoTimerNum :: 0
+		end if
+		}
+	end func
+	
+	;//////////////////////////////////////////////// I/O系関数 ////////////////////////////////////////////////////////////////////////
+	;どうでもいいやつ
+	
+	+func getLife(): int
+		ret me.life
+	end func
+	+func getDefused(): int
+		ret me.defused
+	end func
+	+func getSPD(): int
+		ret me.layerData[me.currentLayer][2]
+	end func
+	+func getGamemode(): int
+		;finishedか判断(状態の更新(一回しか呼ばれないように。))
+		if(me.difficulty < 1 & me.EDposy < me.scroll - 16 * 20 * 4 & !me.isFinished) {スタッフロールあがりきる}
+			do me.isFinished :: true
+			do me.sideUI.eventPulse(7, me.life) {MUZUIをクリア}
+			do me.mfade :: true
+			do me.mftime :: 10.0
+			do me.mfstart :: me.getRealTime()
+		end if
+		if(me.difficulty > 0 & me.BGM[1].getPos() > EDlimit & !me.isFinished)
+			do me.isFinished :: true
+			do me.sideUI.eventPulse(8, me.life) {MURIクリア}
+			if(me.difficulty = 2)
+				do me.sideUI.eventPulse(13, me.life) {YABAIクリア}
+			end if
+			do me.mfade :: true
+			do me.mftime :: 10.0
+			do me.mfstart :: me.getRealTime()
+		end if
+		if(me.difficulty > 0 & me.life <= 0 & me.EDposy < me.scroll - 16 * 20 * 4 & !me.isFinished)
+			do me.isFinished :: true
+			do me.sideUI.eventPulse(9, me.life) {MURI死亡ゴール}
+			if(me.difficulty = 2)
+				do me.sideUI.eventPulse(14, me.life) {YABAI死亡}
+			end if
+			do me.mfade :: true
+			do me.mftime :: 10.0
+			do me.mfstart :: me.getRealTime()
+		end if
+		;do me.font2.mes(":\{me.BGM[1].getPos()}:", 0, 128){デバッグdebug}
+		;値から判断
+		if(me.isED)
+			if(me.life <= 0)
+				if(me.isFinished)
+					ret 4 {死亡しながら終わった}
+				else
+					ret 3 {エンディング中、死んでるしスクロール中}
+				end if
+			else
+				if(me.isFinished)
+					ret 5 {完全クリア}
+				else
+					ret 2 {エンディング面挑戦中}
+				end if
+			end if
+		else
+			if(me.life <= 0)
+				ret 1 {普通の死亡}
+			else
+				ret 0 {通常面挑戦中}
+			end if
+		end if
+		
+		
+	end func
+	
+	
+	func getCurrentLayer(): []int
+		ret me.layerData[me.currentLayer]
+	end func
+	func getNextLayer(): []int
+		ret me.layerData[(me.currentLayer + 1) % 3]
+	end func
+	func getTime(): float
+		;var temp: []char :: ((me.restTime / 60) $ float + (me.restTime % 60) $ float / 60.0).toStr()
+		ret(me.frameTime) $ float / 60.0
+	end func
+	+func getRealTime(): float
+		ret(lib@sysTime() - me.realStartTime) $ float / 1000.0
+	end func
+	
+	var hayaokuri: int
+	+func postEvent(index: int)
+		switch(index)
+		case 4
+			do me.hayaokuri :+ 1
+			if(me.hayaokuri > 16 * 20)
+				do me.sideUI.eventPulse(4, me.life)
+				do me.hayaokuri :: 0
+			end if
+		end switch
+	end func
+	
+	;//////////////////////////////////////////////////描画関係のもの///////////////////////////////////////////////
+	+func backgroundType(): int
+		var x: int :: me.getCurrentLayer()[3] / 100
+		switch(x)
+		case 0 to 9
+			ret x
+		case 9 to 100
+			ret 9
+		end switch
+	end func
+	
+	func bDraw(x: int, y: int, color: int) {1ブロック素描画}
+		if(color <> -1)
+			if(color = 1)
+				do me.bImage.drawScale((me.pos[0] + x) $ float * me.zoom, (me.pos[1] + y) $ float * me.zoom, 16.0 * me.zoom, 16.0 * me.zoom, color $ float * 16.0, 0.0, 16.0, 16.0, 0x88FFFFFF)
+			else
+				do me.bImage.drawScale((me.pos[0] + x) $ float * me.zoom, (me.pos[1] + y) $ float * me.zoom, 16.0 * me.zoom, 16.0 * me.zoom, color $ float * 16.0, 0.0, 16.0, 16.0, 0xFFFFFFFF)
+			end if
+		end if
+	end func
+	
+	func gridBDraw(i: int, j: int, id: int) {移動するグリッドに合わせて描画する}
+		var y: int :: (j * 16 - me.scroll) % 960
+		do y :: y < -16 ?(y + 960, y)
+		do me.bDraw(i * 16, y, id)
+	end func
+	
+	func gridNDraw(i: int, j: int, num: int)
+		do num :+ 7
+		if(num = 7)
+			do num :: 1
+		end if
+		do me.gridBDraw(i, j, num)
+	end func
+	
+	func numDraw(x: int, y: int, num: int) {数字描画}
+		do num :+ 7
+		if(num = 7)
+			do num :: 1
+		end if
+		do me.bDraw(x, y, num)
+	end func
+	
+	func mask(j: int) {黄色くするやつ}
+		var y: int :: (j * 16 - me.scroll) % 960
+		do y :: y < -16 ?(y + 960, y)
+		do draw@rect(me.pos[0] $ float * me.zoom, (me.pos[1] + y) $ float * me.zoom, 14.0 * 32.0, 32.0, 0x1AFFFF00)
+	end func
+	;///////////////////////////////ここまで部品
+	;///////////////////////////////ここから製品
+	
+	func allBDraw() {本体ブロックテクスチャのまとめ}
+		for i(0, 9) {マップ本体表示}
+			for j(0, 59)
+				do me.gridBDraw(i, j, me.DB.getMap(i, j))
+			end for
+		end for
+		for j(0, 59) {地雷数表示}
+			do me.gridNDraw(12, j, me.DB.lineCountMine(j))
+		end for
+		for j(0, 59) {旗の数表示}
+			do me.gridNDraw(13, j, me.DB.lineCountFlag(j))
+		end for
+		for j(0, 59) {OKかどうか黄色で表示}
+			if(me.DB.isDone(j) = true)
+				do me.mask(j)
+			end if
+		end for
+	end func
+	
+	func ENDDraw()
+		do me.EDImage.show(me.pos[0] * 2, (me.pos[1] + me.EDposy - me.scroll) * 2)
+	end func
+	
+	func curDraw(x: int, y: int) {カーソル描画}
+		{var pos: float :: me.mGetPos()
+		var interval: float :: 60.0 / (me.mGetBPM() $ float)
+		if((me.beforeTime / interval) $ int <> (pos / interval) $ int)
+			do me.beforeTime :: pos
+			do me.curShineFrame :: 8
+			do me.curAni.pulse()
+		end if
+		
+		;do me.curImage.drawScale((me.pos[0] + x - 16) $ float * 2.0, (me.pos[1] + y - 16 - me.scroll) $ float * me.zoom, 96.0, 96.0, 48.0 * (me.curShineFrame / 3) $ float, 0.0, 48.0, 48.0, 0xFFFFFFFF)
+		
+		if(me.curShineFrame > 0)
+			do me.curShineFrame :- 1
+		end if}
+		do me.curAni.autoPulse(me.mGetPos(), me.mGetBPM())
+		do me.curAni.show((me.pos[0] + x - 16) * 2, (me.pos[1] + y - 16 - me.scroll) * 2)
+		
+		;do me.font2.mes("\{me.curShineFrame}", 0, 64)
+	end func
+	
+	class poisons()
+		var x: []int
+		var y: []int
+		var counter: int
+		var instance: []\animation@Explosion
+		*func ctor()
+			do me.x :: #[100]int
+			do me.y :: #[100]int
+			do me.instance :: #[100]\animation@Explosion
+		end func
+		func addPoison(xmasume: int, ymasume: int)
+			do me.x[me.counter] :: xmasume
+			do me.y[me.counter] :: ymasume
+			do me.instance[me.counter] :: #\animation@Explosion
+			do me.counter :+ 1
+		end func
+		+func update(poisonPos: &queue<[]int>)
+			while a(true)
+				var pos: []int :: poisonPos.get()
+				if(pos[0] >= 0 & pos[1] >= 0)
+					do me.addPoison(pos[0], pos[1])
+					skip a
+				end if
+				break a
+			end while
+			do poisonPos.add([-1, -1])
+		end func
+		+func showPoisons(fieldPos: []int, scroll: int)
+			for i(0, me.counter - 1)
+				do me.instance[i].show((fieldPos[0] + me.x[i] * 16 - 16) * 2, (fieldPos[1] + me.y[i] * 16 - 16 - scroll) * 2)
+			end for
+		end func
+		
+	end class
+	var poisonManager: poisons
+	
+	{func defusedShow()
+		do me.timerFont.draw((256.0 + me.pos[0] $ float) * me.zoom, (340.0 + me.pos[1] $ float) * me.zoom, "\{me.defused}", 0xFF000000)
+		if(lib@sysTime() - me.pointedTime < 1000)
+			if(me.pointAnimeBool)
+				do me.timerFont.
+			end if
+			do me.pointAnimeBool :: !me.pointAnimeBool
+		end if
+	end func}
+	
+	func wakuDraw(x: int, y: int, num: int)
+		var ux: int :: num % 3
+		var uy: int :: num / 3
+		do me.uiImage.drawScale((me.pos[0] + x) $ float * me.zoom, (me.pos[1] + y) $ float * me.zoom, 16.0 * me.zoom, 16.0 * me.zoom, (ux * 16) $ float, (uy * 16) $ float, 16.0, 16.0, 0xFFFFFFFF)
+	end func
+	
+	func mes(x: int, y: int, moji: []char)
+		do me.tempFont.draw((me.pos[0] + x) $ float * me.zoom, (me.pos[1] + y) $ float * me.zoom, moji, draw@white)
+	end func
+	
+	{func scrollPos(localY: int): int {マップの描写、スクロール込みでちょっと面倒なので関数つかう}
+		do localY :% (20 * 16)
+		if(localY < 10 * 16)
+			do localY :+ 20 * 16
+		end if
+		ret localY
+	end func}
+	
+	+func allDraw() {全部描画}
+		{{臨時入れ}
+		do me.font2.mes("BO:\{me.mGetBPM()}", 0, 32) {；；；；；；；；；；；；；；；；；；；；；；；}
+		do me.font2.mes("SP:\{me.getGamemode()}", 0, 64)
+		do me.font2.mes("CE:\{me.scroll}", 0, 320)
+		do me.font2.mes("\{me.hayaokuri}", 0, 352)
+		}
+		
+		
+		do me.allBDraw()
+		do me.ENDDraw()
+		do me.frontBlack.show(64 * 2, 64 * 2, 32 * 14, 32 * 20, 192)
+		switch(me.getGamemode())
+		case 1, 3, 5
+			do me.frontBlack.on()
+		end switch
+		;ED画像かくよ
+		if(me.isED = true)
+			do me.staffRoll.mes(me.pos[0] * 2, me.pos[1] * 2 + 32 + (me.EDposy - me.scroll) * 2 + 640)
+		end if
+		
+		do me.curDraw(me.cPos[0] * 16, me.cPos[1] * 16) {カーソル}
+		do me.poisonManager.update(&me.DB.poisonList)
+		do me.poisonManager.showPoisons(me.pos, me.scroll)
+		;隠す
+		do draw@rect(me.pos[0] $ float * me.zoom, (me.pos[1] - 320) $ float * me.zoom, (160.0 + 64.0) * me.zoom, 320.0 * me.zoom, 0xFF163035) {上}
+		for j(-5, -2)
+			do me.wakuDraw(0, j * 16, 3)
+			do me.wakuDraw(16 * 13, j * 16, 5)
+		end for
+		for i(1, 12)
+			do me.wakuDraw(16 * i, -16, 7)
+		end for
+		do me.wakuDraw(0, -16, 6)
+		do me.wakuDraw(16 * 13, -16, 8)
+		do draw@rect(me.pos[0] $ float * me.zoom, (me.pos[1] + 320) $ float * me.zoom, (160.0 + 64.0) * me.zoom, 320.0 * me.zoom, 0xFF163035) {下}
+		for j(21, 26)
+			do me.wakuDraw(0, j * 16, 3)
+			do me.wakuDraw(16 * 13, j * 16, 5)
+		end for
+		for i(1, 12)
+			do me.wakuDraw(16 * i, 16 * 20, 1)
+		end for
+		do me.wakuDraw(0, 16 * 20, 0)
+		do me.wakuDraw(16 * 13, 16 * 20, 2)
+		;ui中身
+		{for i(0, me.life - 1){life中身}
+			do me.lifeImage.drawScale((me.pos[0] + i * 16 + 16) $ float * me.zoom, (me.pos[1] - 16 * 4) $ float * me.zoom, 16.0 * me.zoom, 16.0 * me.zoom, 0.0, 0.0, 16.0, 16.0, 0x88FFFFFF)
+		end for}
+		
+		var temp: []int :: me.getCurrentLayer()
+		do me.font2.mes("NOW*", 96 + me.pos[0], -32 + me.pos[1])
+		do me.font2.mes("CELL:\{temp[3] / 100}", 32 * 6 + me.pos[0], -32 + me.pos[1])
+		do me.font2.mes("BOMB:\{temp[0]}/200__SPD*:\{temp[2]}", 96 + me.pos[0], -0 + me.pos[1])
+		
+		do temp :: me.getNextLayer()
+		do me.font2.mes("NEXT", 96 + me.pos[0], 32 * 23 + me.pos[1])
+		do me.font2.mes("CELL:\{temp[3] / 100}", 32 * 6 + me.pos[0], 32 * 23 + me.pos[1])
+		do me.font2.mes("BOMB:\{temp[0]}/200__SPD*:\{temp[2]}", 96 + me.pos[0], 32 * 24 + me.pos[1])
+		
+		;フェーズ分け線黄色
+		var time: int :: lib@sysTime()
+		if(time % 600 > 300)
+			do draw@rect(me.pos[0] $ float * me.zoom, (me.pos[1] $ float + 320.0 - (me.scroll % 320) $ float) * me.zoom, 320.0, 2.0, 0xFFFFFF00) {境目ライン}
+		end if
+		
+		;その他更新
+		do me.mUpdateStatus()
+	end func
+	
+	+func uiShow(mode: int)
+		do me.upperUI.show(me.pos[0] * 2, me.pos[1] * 2, mode)
+	end func
+	
+	+func sideUIShow()
+		do me.sideUI.nekoShow(me.pos[0] * 2, me.pos[1] * 2)
+		do draw@rect((me.pos[0] + 16 * 18) $ float * 2.0, (me.pos[1] + 16 * 19) $ float * 2.0, (16.0 * 18.0) * me.zoom, 48.0 * me.zoom, 0xFF163035) {上}
+		
+		do me.wakuDraw(16 * 19, 16 * 18, 0)
+		for i(0, 15)
+			do me.wakuDraw(16 * (20 + i), 16 * 18, 1)
+		end for
+		do me.wakuDraw(16 * 18, 16 * 19, 0)
+		do me.wakuDraw(16 * 19, 16 * 19, 8)
+		
+		do me.wakuDraw(16 * 17, 16 * 20, 0)
+		do me.wakuDraw(16 * 18, 16 * 20, 8)
+		
+		do me.wakuDraw(16 * 16, 16 * 21, 0)
+		do me.wakuDraw(16 * 17, 16 * 21, 8)
+		
+		do me.wakuDraw(16 * 16, 16 * 22, 6)
+		for i(0, 18)
+			do me.wakuDraw(16 * (17 + i), 16 * 22, 7)
+		end for
+		
+		do me.sideUI.show(me.pos[0] * 2, me.pos[1] * 2, me.defused, me.frameTime, me.getRealTime(), me.life)
+	end func
+	
+	{+func uiMove(move: int)
+		do me.upperUI.cursorMove(move)
+	end func}
+	
+	+func onShift() {Shift中の枠線を表示}
+		var y: int :: me.cPos[1]
+		
+		;まずは端っこがどこにあるか取得
+		var hidari: int :: me.DB.getHidari(y)
+		var migi: int :: me.DB.getHaba(y) + hidari
+		do me.shiftImage.drawScale((me.pos[0] $ float - 2.0 + hidari $ float * 16.0) * me.zoom, (me.pos[1] $ float - 2.0 + y $ float * 16.0 - me.scroll $ float) * me.zoom, 2.0 * me.zoom, 20.0 * me.zoom, 0.0, 0.0, 2.0, 20.0, 0xFFFFFFFF)
+		for i(hidari, migi - 1)
+			do me.shiftImage.drawScale((me.pos[0] $ float + 16.0 * i $ float) * me.zoom, (me.pos[1] $ float - 2.0 + y $ float * 16.0 - me.scroll $ float) * me.zoom, 16.0 * me.zoom, 20.0 * me.zoom, 2.0, 0.0, 16.0, 20.0, 0xFFFFFFFF)
+		end for
+		do me.shiftImage.drawScale((me.pos[0] $ float + 16.0 * migi $ float) * me.zoom, (me.pos[1] $ float - 2.0 + y $ float * 16.0 - me.scroll $ float) * me.zoom, 2.0 * me.zoom, 20.0 * me.zoom, 18.0, 0.0, 2.0, 20.0, 0xFFFFFFFF)
+		do me.curDraw(me.cPos[0] * 16, me.cPos[1] * 16) {カーソルが見えにくくなるので}
+	end func
+	
+	+func showUpper(): []bool {何かしらの全画面演出を表示、返り値として動作可能、操作可能を配列で返している}
+		if(me.decoNo > 0 & me.decoRest <= 0)
+			do me.decoNo :: 0
+			do me.decoStart :: me.getRealTime()
+		end if
+		switch(me.decoNo)
+		case 0
+			ret[true, true]
+		case 1
+			switch(me.decoRest)
+			case 32 to 999
+				;ピピっていう音待ち
+				do me.decoRest :- 1
+				;もともとは30フレームで終わるはずだったので
+				if(me.getRealTime() - me.decoStart > 0.5)
+					do me.decoRest :: 31
+					do me.decoStart :: me.getRealTime()
+				end if
+				ret[false, false]
+			case 31
+				do me.explosionSE.play()
+				do me.decoRest :- 1
+				ret[false, false]
+			case 1
+				do me.decoRest :- 1
+				ret[true, true]
+			default
+				do me.decoRest :- 1
+				;もともとは30フレームで終わるはずだったので
+				if(me.getRealTime() - me.decoStart > 0.5)
+					do me.decoRest :: 1
+					do me.decoStart :: me.getRealTime()
+				end if
+				if(me.difficulty >= 2)
+					ret[true, true]
+				end if
+				ret[true, false] {動く、操作できない}
+			end switch
+		case 2 {エンディング前岩}
+			switch(me.decoRest)
+			case 2 to 999
+				do me.decoRest :- 1
+				;もともとは300フレームで終わるはずだったので
+				if(me.getRealTime() - me.decoStart > 5.0)
+					do me.decoRest :: 1
+				end if
+				ret[false, false]
+			case 1
+				do me.layerData[me.currentLayer][2] :: 256 * 16
+				do me.decoRest :- 1
+				
+				if(me.difficulty = 0)
+					do me.mPlay_(3)
+				else
+					do me.mPlay_(1)
+				end if
+				ret[false, false]
+			end switch
+		default
+			throw 0xF {作成していない演出が呼び出されました}
+		end switch
+		
+		throw 0xFF {動作が可能かどうかretしていません}
+	end func
+	
+	func explosion()
+		do me.pipiSE.play()
+		do me.decoNo :: 1
+		do me.decoRest :: 60
+		do me.decoStart :: me.getRealTime()
+		;do me.poisonManager.update(&me.DB.poisonList)
+		do me.addStatus("explosion", 1)
+		do me.sideUI.eventPulse(2, me.life)
+	end func
+	
+	func invalid()
+		do me.invalidSE.play()
+		do me.addStatus("invalid", 1)
+		do me.sideUI.eventPulse(3, me.life)
+	end func
+	
+	func tissaku()
+		do me.zoom :- 0.1
+	end func
+	
+	
+	;/////////////////////////////////////////////操作、動作関係の外部公開関数////////////////////////////////////////
+	
+	+func scrolling() {表示部分の外部参照的な座標を移動させる}{ついでにスクロールに関する各種更新作業も行いたい}
+		switch(me.getGamemode())
+		case 1, 4, 5
+			ret
+		end switch
+		do me.scroll :+ 1
+		;カーソル強制移動
+		if((me.cPos[1] * 16 - me.scroll) < 0)
+			do me.curMove(0, 1)
+		end if
+		;カーソル範囲変更
+		do me.cPosMin :: 0 + ((me.scroll - 1) / 16 + 1)
+		do me.cPosMax :: 19 + (me.scroll + 8) / 16
+		;オイオイエンディングに関わる諸々の演出だよ
+		switch(me.EDposy - me.scroll)
+		case 16 * -20
+			if(me.difficulty = 0)
+				do me.sideUI.eventPulse(5, me.life)
+			end if
+			if(me.difficulty = 1)
+				do me.sideUI.eventPulse(6, me.life)
+			end if
+			if(me.difficulty = 2)
+				do me.sideUI.eventPulse(11, me.life)
+			end if
+		case 0
+			do me.mStop()
+			do me.prayerSE.play()
+			do me.decoNo :: 2
+			do me.decoRest :: 300
+			do me.decoStart :: me.getRealTime()
+			do me.isED :: true
+			do me.bImage :: me.aImage
+			do me.sideUI.eventPulse(12, me.life)
+			
+		case 16 * 10
+			do me.mfade :: true
+			do me.mftime :: 15.0
+			do me.mfstart :: me.getRealTime()
+		end switch
+		;切が良くなった！
+		if(me.scroll % 320 = 0)
+			if(me.life > 0)
+				do me.life :: 5 {///////////////////////////////////////////////////////////////////}
+				if(me.scroll / 320 <= 7)
+					do me.passedSE.play()
+				end if
+			end if
+			;ログファイル更新
+			do me.updateLogMes()
+			;次の次登場するやつをリセット
+			switch((me.scroll / 320) % 3)
+			case 0
+				do me.load(2)
+				do me.DB.lineUpdateUnvisible(39)
+			case 1
+				do me.load(0)
+				do me.DB.lineUpdateUnvisible(59)
+			case 2
+				do me.load(1)
+				do me.DB.lineUpdateUnvisible(19)
+			end switch
+			;下に合わせて更新
+			do me.DB.lineUpdate(me.cPosMax + 1)
+		end if
+		;オ、上の方チェックすっか～～～
+		if(me.scroll % 16 = 1 & me.getGamemode() <> 3) {死んでるけど流れてるときは爆発しない}
+			var y: int :: me.scroll / 16
+			;クリアしてる列を保護する
+			if(me.DB.lineCountUnopen(y) = me.DB.lineCountMine(y))
+				do me.DB.lineProtect(y)
+			end if
+			if(me.DB.isClear(y) = false)
+				do me.life :- 1
+			elif(me.DB.lineCountMine(y) > 0)
+				;do me.life :+ me.life = 3 ?(0, 1)
+			end if
+			;上のほうにいった爆弾をチェックする
+			var temp: int
+			for i(0, 9)
+				if(me.DB.open(i, y) = 3)
+					do temp :+ 1
+				end if
+			end for
+			if(temp > 0)
+				do me.explosion()
+				;do me.life :- 1
+			end if
+			;フラグ多すぎな
+			if(me.DB.lineCountMine(y) < me.DB.lineCountFlag(y))
+				do me.invalid()
+			end if
+			;正解分のスコア増加
+			if(me.DB.lineCountMine(y) > 0)
+				do me.plusDefused(me.DB.lineCountMine(y))
+			end if
+		end if
+	end func
+	
+	
+	func plusDefused(point: int)
+		var temp: int :: 0
+		do temp :+ point
+		if(me.isED) {エンディング時は倍率かかる}
+			switch(me.difficulty)
+			case 0, 1 {そこそこ難度なら2倍}
+				do temp :+ point
+			case 2 {高難度では4倍}
+				do temp :+ point * 3
+			end switch
+			;do wnd@msgBox(null, "temp:\{temp}", null, %info, %ok)
+		end if
+		do me.defused :+ temp
+		do me.sideUI.pointPlused(temp)
+	end func
+	
+	+func curMove(x: int, y: int) {カーソル移動}{1ずつしか動くことを想定されていない}
+		do me.cPos[0] :+ x
+		do me.cPos[1] :+ y
+		;Xの判定から
+		if(x <> 0)
+			if(me.cPos[0] = me.DB.getHidari(me.cPos[1]) - 1)
+				do me.cPos[0] :: me.DB.getHidari(me.cPos[1]) + me.DB.getHaba(me.cPos[1]) - 1
+			end if
+			if(me.cPos[0] = me.DB.getHidari(me.cPos[1]) + me.DB.getHaba(me.cPos[1]))
+				do me.cPos[0] :: me.DB.getHidari(me.cPos[1])
+			end if
+		end if
+		;Yの判定へ
+		if(y <> 0)
+			do me.cPos[1] :: me.cPos[1].clamp(me.cPosMin, me.cPosMax)
+			if(me.DB.getMap(me.cPos[0], me.cPos[1]) = -1)
+				do me.cPos[0] :: me.cPos[0].clamp(me.DB.getHidari(me.cPos[1]), me.DB.getHidari(me.cPos[1]) + me.DB.getHaba(me.cPos[1]) - 1)
+			end if
+		end if
+	end func
+	
+	
+	
+	
+	
+	+func decisionA() {%aが押下されたとき}
+		var x: int :: me.cPos[0]
+		var y: int :: me.cPos[1]
+		switch(me.DB.getMap(x, y))
+		case 0, 5 {おや、開けますわね}
+			do me.addStatus("normalOpen", 1)
+			switch(me.DB.open(x, y))
+			case 1
+				do me.openSE.play()
+			case 3
+				do me.explosion()
+				do me.life :- 1
+			end switch
+		case 1, 8 to 15 {激烈に開きますわよ}
+			do me.addStatus("powerOpen1", 1)
+			switch(me.DB.powerOpen(me.cPos[0], me.cPos[1]))
+			case 1 to 100
+				do me.powerSE.play()
+			case -1
+				do me.explosion()
+				do me.life :- 1
+			end switch
+		end switch
+	end func
+	
+	+func decisionB() {%bが押下されたとき}
+		var x: int :: me.cPos[0]
+		var y: int :: me.cPos[1]
+		switch(me.DB.getMap(x, y))
+		case 0, 2
+			do me.flagSE.play()
+			do me.DB.flag(me.cPos[0], me.cPos[1])
+		case 1, 8 to 15
+			do me.addStatus("powerOpen2", 1)
+			switch(me.DB.powerOpen2(me.cPos[1]))
+			case 1 to 100
+				do me.powerSE.play()
+			case -1
+				do me.explosion()
+				do me.life :- 1
+			end switch
+		end switch
+	end func
+	
+	+func shift(x: int)
+		do me.shiftSE.play()
+		do me.DB.shift(x, me.cPos[1])
+		;do me.poisonManager.shift(x, me.cPos[1])
+	end func
+	
+	;////////////////DEBUG用
+	+func debug(): []char
+		ret me.scroll.toStr()
+	end func
+	
+	+func debug_life(x: int)
+		do me.life :+ x
+	end func
+	
+	+func debug_clear()
+		var layer: int :: me.currentLayer
+		do me.DB.narrowMap(layer * 20, layer * 20 + 19, 0, 9)
+	end func
+	
+	+func debug_death()
+		do me.defused :: 100
+		do me.life :: 0
+	end func
+	
+	+func debug_mes()
+		do me.sideUI.eventPulse(10, me.life)
+	end func
+	
+	+func debug_win()
+		if(me.getGamemode() = 2 | me.getGamemode() = 3)
+			do me.mSetEND()
+		else
+			do me.loadCounter :: 6
+			for layer(0, 2)
+				do me.DB.narrowMap(layer * 20, layer * 20 + 19, 0, 9)
+				do me.layerData[layer][1] :: 10 * 20
+				do me.DB.addMine(layer * 20, layer * 20 + 19, 5)
+				do me.layerData[layer][0] :: 5
+				do me.layerData[layer][2] :: 256
+			end for
+		end if
+	end func
+	
+	func addStatus(key: []char, num: int)
+		var exist: bool
+		var saisyo: int :: me.status.get(key, &exist)
+		do me.status.add(key, saisyo + num)
+	end func
+	
+	func updateLogMes()
+		var str: lib@Str :: #lib@Str {文字列をラップしたクラス}
+		do str.value :: "" {空文字列を設定しておく}
+		do me.status.forEach(callback, str)
+		func callback(key: []char, value: int, data: lib@Str): bool
+			do data.value :~ "\{key}:\{value}." {各要素に対して文字列を追加する}
+			ret true {継続する場合はtrue、中止する場合はfalseを返す}
+		end func
+		
+		var layerData: []int :: me.getCurrentLayer()
+		do me.logMes :: me.logMes ~ "通過:\{layerData[3]} Time:\{me.getRealTime()} Defused:\{me.defused}" ~ "\n" ~ str.value ~ "\n"
+	end func
+	
+	+func outputLogMes(title: []char)
+		if(me.logOutputted = false)
+			var handle: file@Writer :: file@makeWriter(file@exeDir() ~ "\{title}_v0.12(\{lib@now()}).txt", false)
+			do handle.writeStr(me.logMes)
+			do handle.fin()
+			do me.logOutputted :: true
+		end if
+	end func
+	
+	;///////////////////////////////　音　楽　///////////////////////////////
+	var mfade: bool
+	var mftime: float
+	var mfstart: float
+	+func mPlay(track: int)
+		var looptime: float :: 0.0
+		if(track = 0)
+			do looptime :: 8.108
+		end if
+		do me.BGM[track].playLoop(looptime)
+		do me.BGM[track].volume(1.0)
+		do me.mfade :: false
+	end func
+	+func mPlay_(track: int)
+		do me.BGM[track].play()
+		do me.BGM[track].volume(1.0)
+		do me.mfade :: false
+	end func
+	+func mStop()
+		for i(0, ^me.BGM - 1)
+			do me.BGM[i].stop()
+		end for
+	end func
+	+func mGetPos(): float
+		for i(0, ^me.BGM - 1)
+			if(me.BGM[i].playing() = true)
+				ret me.BGM[i].getPos()
+			end if
+		end for
+		ret - 1.0
+	end func
+	+func mGetBPM(): int
+		for i(0, ^me.BGM - 1)
+			if(me.BGM[i].playing() = true)
+				ret me.bpm[i]
+			end if
+		end for
+		ret - 1
+	end func
+	
+	+func mSetEND()
+		for i(0, ^me.BGM - 1)
+			if(me.BGM[i].playing() = true)
+				do me.BGM[i].setPos(EDlimit - 1.0)
+			end if
+		end for
+	end func
+	+func mUpdateStatus()
+		if(me.mfade = true)
+			for i(0, ^me.BGM - 1)
+				if(me.BGM[i].playing() = true)
+					var volume: float :: (1.0 - (me.getRealTime() - me.mfstart) / me.mftime).clamp(0.0, 1.0)
+					do me.BGM[i].volume(volume)
+					if(volume <= 0.0)
+						do me.mfade :: false
+					end if
+					ret
+				end if
+			end for
+		end if
+	end func
+	
+end class

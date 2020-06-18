@@ -1,0 +1,259 @@
+class SideUI()
+	var icon: draw@Tex
+	var tagFont: \font@FontTag
+	var gnFont: \font@FontGT
+	var hrFont: \font@FontHR
+	var lifeTex: draw@Tex
+	
+	var text: []char
+	var texts: [][]char
+	var textTimer: int
+	;var karineko: draw@Tex
+	var neko: \neko@Neko
+	var mesDB: @Messages
+	
+	var font: draw@Font
+	*func ctor()
+		do me.icon :: draw@makeTex("res/icons.png")
+		do me.tagFont :: #\font@FontTag
+		do me.gnFont :: #\font@FontGT
+		do me.hrFont :: #\font@FontHR
+		do me.lifeTex :: draw@makeTex("res/whiteLife.png")
+		
+		;do me.karineko :: draw@makeTex("res/karineko.png")
+		do me.neko :: #\neko@Neko
+		do me.mesDB :: #@Messages
+		do me.text :: me.mesDB.get(0)
+		do me.convertText()
+		do me.textTimer :: 0
+		
+		do me.font :: draw@makeFont(null, 18, false, false, false, 32.0)
+	end func
+	
+	+func nekoShow(x: int, y: int)
+		;neko
+		;do me.karineko.drawScale((32 * 17 + x) $ float, (y + 32 * 3) $ float, 512.0, 512.0, 0.0, 0.0, 512.0, 512.0, 0xFFFFFFFF)
+		do me.neko.draw(32 * 17 + x, y + 32 * 3, lib@sysTime(), 0, 0, false)
+	end func
+	
+	var pointedTime: int
+	var plusPoint: int
+	var pointAnimeBool: int
+	var position: int
+	+func pointPlused(point: int)
+		do me.pointedTime :: lib@sysTime()
+		do me.plusPoint :: point
+		do me.pointAnimeBool :: 4
+		do me.position :: 0
+	end func
+	
+	+func show(x: int, y: int, defused: int, frameTimer: int, realTime: float, life: int)
+		;score
+		do me.tagFont.mes("S", 32 * 15 + x, -32 * 3 + y)
+		do me.gnFont.mesMigizoroe("\{defused}", 32 * 20 + x, -32 * 3 + y)
+		if(lib@sysTime() - me.pointedTime < 500)
+			if(me.pointAnimeBool / 2 % 2 = 1)
+				do me.gnFont.mesTomei_("+\{me.plusPoint}", 32 * 20 + x, -32 * 2 + y + me.position)
+			end if
+			do me.pointAnimeBool :: (me.pointAnimeBool + 3) % 4
+			do me.position :- 2
+		end if
+		;timer
+		do me.icon.drawScale((32 * 15 + x) $ float, (-32 * 1 + y) $ float, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, 0xFFFFFFFF)
+		;do me.gnFont.mes("\{(frameTimer $ float / 60.0)}", 32 * 16 + x, -32 * 1 + y)
+		do me.gnFont.mes("\{realTime}", 32 * 16 + x, y - 32)
+		do me.gnFont.mes("\{realTime / (frameTimer $ float / 60.0) - 1.0}", 32 * 22 + x, y - 32)
+		;HPはtimeの二個下に五連続
+		for i(0, life - 1)
+			var color: int
+			switch(i)
+			case 0
+				do color :: 0xFFE38980
+			case 1
+				do color :: 0xFFE4BC6D
+			default
+				do color :: 0xFF99E49D
+			end switch
+			
+			do me.lifeTex.drawScale((32 * 15 + x) $ float, (32 + y + 32 * i) $ float, 32.0, 32.0, 0.0, 0.0, 16.0, 16.0, color)
+		end for
+		;text
+		do me.textTimer :+ 1
+		var mojisu: int :: me.textTimer / 2
+		for i(0, 2)
+			;do me.font.draw(32.0 * 25.0, 32.0 * (23.0 + i $ float), me.texts[i].sub(0, (mojisu - 16 * i).clamp(0, 13)), 0xFFFFFFFF)
+			do me.hrFont.mes(me.texts[i].sub(0, (mojisu - 16 * i).clamp(0, 13)), 32 * 25, 32 * (23 + i))
+		end for
+		if(me.textTimer > 60 * 30) {30秒ごとになにか切り替え}
+			do me.eventPulse(0, life)
+		end if
+	end func
+	
+	func convertText()
+		do me.texts :: me.text.split("・")
+	end func
+	
+	;イベントが起きて、メッセージを変化させる
+	+func eventPulse(id: int, life: int)
+		do me.text :: me.mesDB.get(id)
+		do me.convertText()
+		do me.neko.pulse(me.texts[3], life, lib@sysTime())
+		do me.textTimer :: 0
+	end func
+	
+end class
+
+class Messages()
+	var messages: [][][]char
+	*func ctor()
+		do me.messages :: #[20, 10, 39]char
+		;0-ひま
+		
+		do me.messages[0] :: [
+		|"ねこはかつおぶしがすきって・いうけどたべすぎるとどくに・なるの　　　　　　　　　　・3",
+		|"つなかんはたべてみたいけど・にんげんようのはしょっぱい・しあぶらっぽすぎ　　　　　・3",
+		|"ねこじゃらしってなんでめを・ひくうごきかたするんだろう・　　　　　　　　　　　　　・4",
+		|"あったかいところにいくと　・しぜんとまぶたがとじてくる・　　　　　　　　　　　　　・2",
+		|"ねこだからってことばのあと・にいつでもにゃーとつける　・わけじゃないんだにゃー　　・2",
+		|"あんまりわたしのことばかり・みてたらしゅうちゅうして　・ないのかとおもっちゃう　　・2",
+		|"かぷせるあるとずらしたとき・みやすいけどおかないほうが・はやいよね　　　　　　　　・6",
+		|"ういるすはひらいたらかずに・かぞえられないからちゅうい・　　　　　　　　　　　　　・3",
+		|"ういるすってえいごみたい　・だけどえいごではばいるす　・ってよむらしい　　　　　　・7",
+		|"ねこはいぬはっていうけど　・わたしはいぬのことなんとも・おもってないよ　　　　　　・2"
+		|]
+		
+		;1-すたーと
+		do me.messages[1] :: [
+		|"とおう　あなたがこんかいの・ぷれいやーさんか？　　　　・　　　　　　　　　　　　　・4",
+		|"そんなじゅんびで　　　　　・だいじょうぶか　　　　　　・もんだいなさそう　　　　　・4",
+		|"れっつごー　　　　　　　　・おーきーどーきー　　　　　・　　　　　　　　　　　　　・4",
+		|"ごーごー　　　　　　　　　・れっつごー　　　　　　　　・　　　　　　　　　　　　　・4",
+		|"けいけんち　たまるかなー？・ぼうけんのじかんだ！　　　・　　　　　　　　　　　　　・4",
+		|"ここがあのういるすの　　　・すみかね　　　　　　　　　・　　　　　　　　　　　　　・2",
+		|"やってきました　　　　　　・いせかいはろー！　　　　　・　　　　　　　　　　　　　・4",
+		|"しんちょうにいそいでいこう・いのちだいじにがんがん　　・いこうね　　　　　　　　　・4",
+		|"いそいでほしいけどごばくは・やだよ　　　やさしくしてね・　　　　　　　　　　　　　・4",
+		|"おはよう　だめーじ。　　　・もう　あさがよい。　　　　・　　　　　　　　　　　　　・2"
+		|]
+		
+		;2-おはようダメージ
+		do me.messages[2] :: [
+		|"うっ　　　　　　　　　　　・もっとちゅういぶかくね　　・　　　　　　　　　　　　　・9",
+		|"いたっ　　　　　　　　　　・すうじをみまちがえないで　・　　　　　　　　　　　　　・8",
+		|"うぐっ　　　　　　　　　　・そうさみす？　　　　　　　・　　　　　　　　　　　　　・9",
+		|"あうっ　　　　　　　　　　・まちがえないでよ　　　　　・　　　　　　　　　　　　　・8",
+		|"うう　　　　　　　　　　　・ちゃんとすうじみてよ　　　・　　　　　　　　　　　　　・9",
+		|"んぐっ　　　　　　　　　　・こっちみてないでめのまえに・しゅうちゅうしてよ　　　　・9",
+		|"いたた　　　　　　　　　　・もっとじょうずにできないの・　　　　　　　　　　　　　・8",
+		|"にゃっ　　　　　　　　　　・びっくりするでしょ　　　　・　　　　　　　　　　　　　・8",
+		|"うわっ　　　　　　　　　　・やだもう　　　　　　　　　・　　　　　　　　　　　　　・8",
+		|"にゃーん　　　　　　　　　・もうやにゃー　　　　　　　・　　　　　　　　　　　　　・8"
+		|]
+		
+		;3-まちがい旗
+		do me.messages[3] :: [
+		|"ちょっと　　　　　　　　　・かぷせるむだづかいしないで・　　　　　　　　　　　　　・3",
+		|"かぷせるつかいすぎ　　　　・えこじゃないよ　　　　　　・　　　　　　　　　　　　　・3",
+		|"きいろいれつはもう　　　　・かぷせるをおかなくても　　・いいところだよ　　　　　　・3"
+		|]
+		;4-早送りしまくり
+		do me.messages[4] :: [
+		|"いそぎすぎないでよ　　　　・だいたいろくなことないから・　　　　　　　　　　　　　・3",
+		|"はやおくりは　　　　　　　・じこせきにんでね　　　　　・　　　　　　　　　　　　　・3",
+		|"ちょうしのってると　　　　・いたいめみるかもよ　　　　・　　　　　　　　　　　　　・7",
+		|"たいむあたっくは　　　　　・たのしいけど　　　　　　　・だいたいじこる　　　　　　・3",
+		|"いいのかな　　　　　　　　・なれないはやさ　　　　　　・じこのもと　　　　　　　　・2",
+		|"かっこつけなくても　　　　・いいんだよ　　　　　　　　・　　　　　　　　　　　　　・6",
+		|"てくいうごきは　　　　　　・それでみすしたら　　　　　・はずかしいだけだからね　　・7",
+		|"したまでほりきってから　　・おちついてはやおくりしよう・　　　　　　　　　　　　　・2"
+		|]
+		;5-かんたんEDスタート
+		do me.messages[5] :: [
+		|"このげーむをつくった　　　・ひとたちのいちらんだよ　　・　　　　　　　　　　　　　・7",
+		|"おめでとう　　　　　　　　・いわゆるすたっふろーるって・やつだよ　　　　　　　　　・7"
+		|]
+		;6-MURI EDスタート
+		do me.messages[6] :: [
+		|"なんかものたりないあなたに・ちゃんとしたじごくをようい・したよ！　　　　　　　　　・7",
+		|"ごくろうだった、といいたい・ところだけどきみには　　　・きえてもらう。　　　　　　・2",
+		|"どこまでもがきくるしむか　・みせてもらおう。　　　　　・　　　　　　　　　　　　　・2",
+		|"じつはこのもーどヒャたろう・もくりあできてない　　　　・らしいよ　　　　　　　　　・3",
+		|"ここからはヒャたろうの　　・あくいによっておおくり　　・します　　　　　　　　　　・2",
+		|"みて　ぷれいやーがよろこん・でるよ　かわいいね　　　　・　　　　　　　　　　　　　・7",
+		|"いきのびろ！　ぼーなすてん・ほしいでしょ　　　　　　　・　　　　　　　　　　　　　・4",
+		|"これでくりあといったな　　・あれはうそだ　　　　　　　・　　　　　　　　　　　　　・2"
+		|]
+		;7-MUZUIクリア
+		do me.messages[7] :: [
+		|"ほんとうにあそんでくれて　・ありがとうね　　　　　　　・　　　　　　　　　　　　　・0",
+		|"つぎはむりもーどであおう！・　　　　　　　　　　　　　・　　　　　　　　　　　　　・0",
+		|"つぎはもっとむずかしいのを・やってみようよ　　　　　　・　　　　　　　　　　　　　・4",
+		|"むずいもーどはまだかんたん・だよ　　　　　　　　　　　・　　　　　　　　　　　　　・7",
+		|"むりもーど、いまならいける・んじゃない？　　　　　　　・　　　　　　　　　　　　　・4",
+		|"むずいもーどのつぎは　　　・むりもーどだね　　　　　　・　　　　　　　　　　　　　・7"
+		|]
+		;8-MURIクリア
+		do me.messages[8] :: [
+		|"むりもーどをくりあ、すごい・　　　　　　　　　　　　　・　　　　　　　　　　　　　・6",
+		|"これでおわり！　　　　　　・とおもうじゃん？　　　　　・　　　　　　　　　　　　　・7",
+		|"むりもーどはむりだと　　　・おもってたよ　　　　　　　・　　　　　　　　　　　　　・6",
+		|"やりてだね　　　　　　　　・うでのじまんを　　　　　　・してもいい　　　　　　　　・0",
+		|"ほんとうにいっぱいあそんで・くれてありがとう！　　　　・さくしゃにじまんしよう！　・4",
+		|"なんいどせんたくでしたを　・じゅっかいおすと？　　　　・　　　　　　　　　　　　　・2",
+		|"むりもーどのつぎは　　　　・すこああたっくだね　　　　・　　　　　　　　　　　　　・4"
+		|]
+		;9-MURIクリアできず
+		do me.messages[9] :: [
+		|"くりあできるまでちょうせん・だね　　　　　　　　　　　・　　　　　　　　　　　　　・1",
+		|"おしかったよ　なれれば　　・いける　　　　　　　　　　・　　　　　　　　　　　はず・1",
+		|"じかんいっぱいまでたえれば・くりあになるからね　　　　・はやおくりしなくてもいいよ・2",
+		|"しんじゃった　　　　　　　・しんのくりあではないね　　・　　　　　　　　　　　　　・7",
+		|"ヒャたろうがすたっふろーる・ちゃんとみせたいとかいう　・からこんなことになった　　・3",
+		|"むねん　　　　　　　　　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・2",
+		|"だいたい　ひゃくにじゅう　・びょうくらいたえれば　　　・くりあになるよ　　　　　　・0",
+		|"わるいのは　ぜんぶ　　　　・ヒャたろうなんだ　　　　　・わたしはわるくない　　　　・2"
+		|]
+		;10-表示確認用
+		do me.messages[10] :: [
+		|"しんちょく　どうですか　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・2"
+		|]
+		;11-YABAIのスタッフロール到達
+		do me.messages[11] :: [
+		|"やば　　　　　　　　　　　・うける　　　　　　　　　　・　　　　　　　　　　　　　・7",
+		|"うごきがきもちわるいね　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・3",
+		|"しょうしんしょうめいのまぞ・だね　　　　　　　　　　　・　　　　　　　　　　　　　・3",
+		|"どんとこい　ちょうじょう　・けっせん　　　　　　　　　・　　　　　　　　　　　　　・2",
+		|"なんでここまでやろうと　　・おもったの　　　　　　　　・　　　　　　　　　　　　　・2"
+		|]
+		;12-クリア岩到達のセリフ
+		do me.messages[12] :: [
+		|"なうろーでぃんぐ。　　　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・2",
+		|"ふー、なんとかにげきったね・　　　　　　　　　　　　　・　　　　　　　　　　　　　・0",
+		|"いやーなんとかなったね　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・0",
+		|"いいねいいね　　　　　　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・4"
+		|]
+		;13-YABAIクリア
+		do me.messages[13] :: [
+		|"なぜここまでやりこもうと　・おもったのか　　　　　　　・　　　　　　　　　　　　　・3",
+		|"もうせかいねらえるよあんた・　　　　　　　　　　　　　・　　　　　　　　　　　　　・6",
+		|"いちおうくりあちぇっくは　・したんだけどまさかね　　　・　　　　　　　　　　　　　・4",
+		|"ぜんぶまるっとおみとおしよ・　　　　　　　　　　　　　・　　　　　　　　　　　　　・7",
+		|"やばやばのやばだね　　　　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・6"
+		|]
+		;14-YABAIクリアできず
+		do me.messages[14] :: [
+		|"なぜべすとをつくさないのか・　　　　　　　　　　　　　・　　　　　　　　　　　　　・3",
+		|"ほらほらもうちょっとだよ　・　　　　　　　　　　　　　・　　　　　　　　　　　　　・7",
+		|"あのほんぺんくりあしてる　・ならなんとかなるでしょ　　・　　　　　　　　　　　　　・2",
+		|"ざんねんだったね　　　　　・ほらもういっかい　　　　　・　　　　　　　　　　　　　・7"
+		|]
+	end func
+	
+	+func get(index: int): []char
+		var num: int :: ^me.messages[index]
+		if(num = 0)
+			throw 0xABC
+		end if
+		ret me.messages[index][lib@rnd(0, num - 1)]
+	end func
+end class
